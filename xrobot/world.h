@@ -491,6 +491,7 @@ public:
     );
 
     bool TakeAction(const int act_id);
+    bool GetCycle() const { return cycle_; }
     void SetCycle(const bool cycle) { cycle_ = cycle; }
     void SetStatus(const int status) { status_ = status; }
     void RemoveRobotTemp();
@@ -591,6 +592,7 @@ public:
     
     std::map<std::string, std::string> tag_list_;
     std::map<std::string, bool> pickable_list_;
+    std::vector<std::string> goal_list_;
 
     std::vector<std::shared_ptr<RobotBase>> robot_list_;
     std::map<int, std::shared_ptr<RobotBase>> bullet_handle_to_robot_map_;

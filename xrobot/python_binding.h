@@ -198,7 +198,7 @@ public:
 	void AssignTag(const std::string& path, const std::string& tag);
 	void LoadTag(const std::string& path);
 	void MakeObjectPickable(const std::string& tag);
-
+	boost::python::list GetGoals() const;
 
 	// Adjust directional light setting. Use python dict to update
 	// the configurations
@@ -327,6 +327,8 @@ public:
 	void LoadModels(const boost::python::list models,
 					const boost::python::list tags);
 	void SpawnModels(const boost::python::dict conf);
+
+	void ResolvePath();
 
 	// Load SUNCG
 	//
@@ -648,6 +650,8 @@ BOOST_PYTHON_MODULE(libxrobot)
 		)
 	)
 
+	.def("ResolvePath", &Playground::ResolvePath)
+	.def("GetGoals", &Playground::GetGoals)
 	.def("LocatePositionInGrid", &Playground::LocatePositionInGrid)
 	.def("LocateObjectInGrid", &Playground::LocateObjectInGrid)
 	.def("GetRoomVisitSequence", &Playground::GetRoomVisitSequence)

@@ -1,15 +1,124 @@
+import cv2
+import numpy as np
 import random
 from context_free_grammar import CFG
 
 class XWorld3DTask(object):
+
+	time_penalty = -0.01
+	correct_reward = 1.0
+	wrong_reward = -1.0
+	collision_penalty = 0.0
+
+	failed_action_penalty = -0.1
+	navigation_max_steps = 10000
+
+	performance_window_size = 200
+
 	def __init__(self, env):
 		self.env = env
 		self.event = ""
 		self.cfg = CFG(*self._define_grammar())
 		self.sentence = ""
+		self.steps_in_cur_task = 0
+		self.success_seq = []
+		self.num_successes = 0
+		self.num_failures = 0
+		self.success_steps = 0
+
+
+	def reset(self):
+		self.steps_in_cur_task = 0
+		self.answer = ""
+		self.env.Clear()
+
+	def __record_result(self, res):
+		self.success_seq.append(res)
+		if len(self.success_seq) > XWorld3DTask.performance_window_size:
+			self.success_seq.pop(0)
+		self._record_env_usage()
+
+	def _record_success(self):
+		self.__record_result(1)
+		self.num_successes += 1
+		self.success_steps += self.steps_in_cur_task
+
+	def _record_failure(self):
+		self.__record_result(0)
+		self.num_failures += 1
+
+	def _record_env_usage(self):
+
+		print "_record_env_usage"
+		# self.env.record_environment_usage(
+		# 	self.__class__.__name__, self.success_seq)
+
+	def _time_reward(self):
+		reward = XWorld3DTask.time_penalty
+		self.steps_in_cur_task += 1
+		if self.steps_in_cur_task >= self.navigation_max_steps:
+			self._record_failure()
+			self._bind("S -> timeup")
+			self.sentence = self._generate()
+			self._record_event("time_up")
+			return (reward, True)
+		return (reward, False)
+
+	def _failed_goal(self, reward):
+		self._record_failure()
+		self._record_event("wrong_goal")
+		reward += XWorld3DTask.wrong_reward
+		self._bind("S -> wrong")
+		self.sentence = self._generate()
+		return reward
+
+	def _successful_goal(self, reward):
+		self._record_success()
+		self._record_event("correct_goal")
+		reward += XWorld3DTask.correct_reward
+		self._bind("S -> correct")
+		self.sentence = self._generate()
+		return reward
+
+	def _record_answer(self, answer):
+		self.answer = answer
+
+	def _record_event(self, event, next=False):
+		if not next:
+			self.event = event
+		else:
+			self.prev_event = event
 
 	def _define_grammar(self):
+		return "", ""
+
+	def _bind(self, binding_str):
+		self.cfg.bind(binding_str)
 		return "",""
+
+	def _generate(self):
+		return self.cfg.generate()
+
+	def _generate_all(self):
+		return self.cfg.generate_all()
+
+	def _set_production_rule(self, rule):
+		self.cfg.set_production_rule(rule)
+
+	def _list_of_strs_to_rhs(self, strs):
+		return "|".join(["'" + s + "'" for s in strs])
+
+	def _get_all_goal_names_as_rhs(self):
+		return self._list_of_strs_to_rhs(self._get_goals())
+
+	def _get_all_goal_names_as_rhs(self, strs):
+		return self._list_of_strs_to_rhs(strs)
+
+	def obtain_performance(self):
+		return (self.num_successes, self.num_failures, self.success_steps)
+
+	def _get_goals(self):
+		return self.env.GetGoals()
 
 	def print_grammar(self):
 		self.cfg.show()
@@ -17,8 +126,35 @@ class XWorld3DTask(object):
 	def total_possible_sentences(self):
 		return self.cfg.total_possible_sentences()
 
-	def get_stages():
+	def conversation_wrapup(self):
+		self._record_event(self.prev_event)
+		self.prev_event = None
+		return ["idle", 0, ""]
+
+	def terminal(self):
+		return ["terminal", 0, ""]
+
+	def get_stages(self):
 		return "idle"
+
+	# Debug
+
+	def display_rgb(self, sentence):
+		image_str = self.env.GetCameraRGBDRaw()
+		image_rgbd = np.fromstring(image_str, np.uint8).reshape( 360, 640, 4 )
+		image_rgbd = cv2.cvtColor(image_rgbd, cv2.COLOR_BGRA2RGBA)
+		image_rgbd = cv2.flip(image_rgbd, 0)
+
+		image_rgbd_resize = cv2.resize(image_rgbd, None, fx=0.75, fy=0.75)
+		image_rgb = np.array(image_rgbd_resize[:,:,:3])
+
+		# frames = "frames: " + str(self.env.GetStatus()["frames"])
+		# framerate = " | framerate: " + str(self.env.GetStatus()["framerate"])
+
+		cv2.putText(image_rgb, sentence, (30,30), \
+			cv2.FONT_HERSHEY_PLAIN, 1, (200,250,250), 1);
+
+		cv2.imshow("RGB", image_rgb)
 
 class Task(object):
 	def __init__(self, task_name, task):
@@ -29,7 +165,11 @@ class Task(object):
 		self.env = None
 
 	def run_stage(self):
-		self.current_stage = self.stages[self.current_stage]()
+		
+		self.current_stage = self.stages[self.current_stage]()[0]
+
+	# def obtain_performance(self):
+
 
 	def register_stage(self, stage_name, func):
 		self.stages[stage_name] = func

@@ -179,6 +179,9 @@ namespace xrobot
 
 		void SpawnSingleObjectAt(const std::string& path, const vec3 position);
 		bool SpawnSingleObject(const std::string& path, const int roomgroup_id = -1);
+		bool SpawnPairOfObjects(const std::string& left_path, 
+								const std::string& right_path, 
+							    const int num = 1, const int roomgroup_id = -1);
 		bool SpawnStackOfObjects(const std::string& top_path, 
 								 const std::string& bottom_path, 
 							     const int num = 1, const int roomgroup_id = -1);
@@ -187,6 +190,8 @@ namespace xrobot
 		bool SpawnSingleObject(const int obj_id, const int roomgroup_id = -1);
 		bool SpawnStackOfObjects(const int top_id, const int bottom_id, 
 							     const int num = 1, const int roomgroup_id = -1);
+		bool SpawnPairOfObjects(const int left_id, const int right_id, 
+							    const int num = 1, const int roomgroup_id = -1);
 
 
 
@@ -237,6 +242,7 @@ namespace xrobot
 		std::vector<RoomGroup> roomgroups_;
 		std::map<std::pair<int,int>, std::shared_ptr<Tile>> tiles_;
 
+		bool agent_spawn_;
 		bool resolve_path_;
 		vec2 agent_spawn_position_;
 

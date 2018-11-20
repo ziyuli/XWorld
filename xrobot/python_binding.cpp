@@ -68,6 +68,19 @@ Playground::Playground(const int w, const int h,
 
 Playground::~Playground() {}
 
+boost::python::list Playground::GetGoals() const
+{
+    std::vector<std::string> goals = scene_->world_->goal_list_;
+
+    boost::python::list goal_list;
+
+    for(const auto& goal : goals) {
+        goal_list.append(goal);
+    }
+
+    return goal_list;
+}
+
 void Playground::AssignTag(const std::string& path, const std::string& tag)
 {
     scene_->world_->AssignTag(path, tag);
@@ -426,6 +439,7 @@ void Playground::LoadBasicObjects(const boost::python::list doors,
 
 void Playground::SpawnModels(const boost::python::dict conf)
 {
+
     std::shared_ptr<MapGrid> scene_grid 
         = std::dynamic_pointer_cast<MapGrid>(scene_);
 
@@ -659,6 +673,13 @@ void Playground::LoadSUNCG(const std::string& house,
     }
 }
 
+void Playground::ResolvePath() 
+{
+    if(auto scene_grid = std::dynamic_pointer_cast<MapGrid>(scene_)) {
+        scene_grid->ResolvePath();
+    }
+}
+
 Thing Playground::SpawnAnObject(const std::string& file, 
 							    const boost::python::list position_py,
 				    			const boost::python::list orentation_py,
@@ -687,6 +708,29 @@ Thing Playground::SpawnAnObject(const std::string& file,
    		}
 		obj_sptr->DisableSleeping();
 	}
+
+    if(auto scene_grid = std::dynamic_pointer_cast<MapGrid>(scene_)) {
+
+        BBox box(
+            glm::vec2(position.x - 0.5f, position.z - 0.5f),
+            glm::vec2(position.x + 0.5f, position.z + 0.5f)
+        );
+
+        scene_grid->GenerateEmpty(box);
+
+        if(!scene_grid->resolve_path_) {
+            std::shared_ptr<SubTile> subtile = scene_grid->GetSubTileFromWorldPosition(
+                glm::vec2(position.x, position.z));
+
+            if(auto tile = subtile->parent.lock()) {
+
+                int roomgroup_id = tile->roomgroup_id;
+
+                auto& waypoints = scene_grid->roomgroups_[roomgroup_id].waypoints;
+                waypoints.push_back(subtile);   
+            }
+        }
+    }
 
 	//scene_->CreateLabel(file, label);
 

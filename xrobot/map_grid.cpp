@@ -26,6 +26,7 @@ MapGrid::MapGrid() : wall_urdf_path_(""),
 					 agent_spawn_position_(vec2(0)),
 					 tiles_(),
 					 resolve_path_(false),
+					 agent_spawn_(false),
 					 rand_device_(),
 					 mt_(rand_device_()),
 					 Map() {
@@ -265,6 +266,16 @@ bool MapGrid::SpawnSingleObject(const std::string& path, const int roomgroup_id)
 	return SpawnSingleObject(obj_id, roomgroup_id);
 }
 
+bool MapGrid::SpawnPairOfObjects(const std::string& left_path, 
+						 		 const std::string& right_path, 
+					     		 const int num, const int roomgroup_id) {
+	int left_id = FindObject(left_path);
+	int right_id = FindObject(right_path);
+	assert(left_id > -1 && right_id > -1);
+
+	return SpawnPairOfObjects(left_id, right_id, num, roomgroup_id);
+}
+
 bool MapGrid::SpawnStackOfObjects(const std::string& top_path, 
 						 const std::string& bottom_path, 
 					     const int num, const int roomgroup_id) {
@@ -276,6 +287,8 @@ bool MapGrid::SpawnStackOfObjects(const std::string& top_path,
 }
 
 bool MapGrid::SpawnSingleObject(const int obj_id, const int roomgroup_id) {
+
+	// printf("00\n");
 
 	const int max_attemps = 8;
 
@@ -293,10 +306,14 @@ bool MapGrid::SpawnSingleObject(const int obj_id, const int roomgroup_id) {
 		int select_room_id = tmp[select_room] - 1;
 		auto tiles = rooms_[select_room_id].tiles;
 
-		// printf("01\n");
+		// printf("n rooms: %d\n", roomgroups_.size());
+		// printf("01 %d %d\n", select_room_id, tiles.size());
+
+		std::vector<std::shared_ptr<Tile>> tiles_copy(tiles);
+		std::random_shuffle(tiles_copy.begin(), tiles_copy.end());
 
 		std::shared_ptr<Tile> select_tile = nullptr;
-		for(auto& tile : tiles) {
+		for(auto& tile : tiles_copy) {
 			if(!tile->occupied) {
 				select_tile = tile;
 				break;
@@ -306,7 +323,7 @@ bool MapGrid::SpawnSingleObject(const int obj_id, const int roomgroup_id) {
 		// printf("02\n");
 
 		if(!select_tile) 
-			select_tile = tiles[(int) GetRandom(0, tiles.size())];
+			select_tile = tiles_copy[(int) GetRandom(0, tiles.size())];
 
 		// printf("03\n");
 
@@ -371,6 +388,30 @@ bool MapGrid::SpawnSingleObject(const int obj_id, const int roomgroup_id) {
 
 	return false;
 }
+
+bool MapGrid::SpawnPairOfObjects(const int left_id, const int right_id, 
+							     const int num, const int roomgroup_id) {
+	const int max_attemps_left = 4;
+	const int max_attemps_right = 4;
+	const int max_distance = 3; // subtile's width x 3
+
+	int num_attempts_left = 0;
+	bool found_left = false;
+	while(num_attempts_left++ < max_attemps_left && !found_left) {
+		found_left = SpawnSingleObject(bottom_id, roomgroup_id);
+	}
+
+	if(found_bottom) {
+		auto& pile = pile_list_.back();
+		auto& bbox = pile.bbox;
+
+
+
+	}
+
+	return false;
+}
+
 
 bool MapGrid::SpawnStackOfObjects(const int top_id, const int bottom_id, 
 							      const int num, const int roomgroup_id) {
@@ -471,10 +512,12 @@ void MapGrid::GenerateEmpty(const BBox box) {
 					}
 				}
 
-				tile_ptr->UpdateTile();
+				// tile_ptr->UpdateTile();
 			}
 		}
 	}
+
+	UpdateDebugVisualization();
 }
 
 void MapGrid::UpdateSceneBBox() {
@@ -505,16 +548,24 @@ void MapGrid::GenerateArena(const int w, const int l) {
 	const int dirx[4] = {1, -1, 0, 0};
 	const int diry[4] = {0, 0, 1, -1};
 
+	rooms_.resize(1);
+	roomgroups_.resize(1);
+
+	std::unordered_set<int> rooms;
+	rooms.insert(1);
+	roomgroups_[0].rooms = rooms;
+
 	Room room;
 
 	for(int i = 0; i < w; ++i)
 	for(int j = 0; j < l; ++j) {
 		vec3 tile_center(kTileSize * i, 0, kTileSize * j);
+		vec2 tile_center_2d(kTileSize * i, kTileSize * j);
 		vec3 tile_bbox_min = tile_center - 0.5f * vec3(kTileSize, 0, kTileSize);
 		vec3 tile_bbox_max = tile_center + 0.5f * vec3(kTileSize, 0, kTileSize);
 
 		std::shared_ptr<Tile> tile = std::make_shared<Tile>(tile_urdf_list_[0], 
-			tile_center);
+			tile_center_2d);
 
 		for (int d = 0; d < 4; ++d) {
 			int x = i + dirx[d];
@@ -528,13 +579,19 @@ void MapGrid::GenerateArena(const int w, const int l) {
 			}
 		}
 
+		tile->room_id = 1; // start from 1
+		tile->roomgroup_id = 0;
+		tile->position = std::make_pair(i,j);
 		tile->occupied = false;
+		tile->UpdateSubTiles();
+
+		tiles_[std::make_pair(i,j)] = tile;
 
 		room.tiles.push_back(tile);
 		GenerateTile(tile_center, 0);
 	}
 
-	rooms_.push_back(room);
+	rooms_[0] = room;
 
 	UpdateSceneBBox();
 }
@@ -582,9 +639,11 @@ void MapGrid::ResolvePath() {
 		std::vector<std::shared_ptr<SubTile>>& dests = dests_map[i];
 
 		// Find Agent
-		auto agent_spawn_room_it = roomgroups_[i].rooms.find(1);
-		if(agent_spawn_room_it != roomgroups_[i].rooms.end()) 
-			dests.push_back(GetSubTileFromWorldPosition(agent_spawn_position_));
+		if(agent_spawn_) {
+			auto agent_spawn_room_it = roomgroups_[i].rooms.find(1);
+			if(agent_spawn_room_it != roomgroups_[i].rooms.end()) 
+				dests.push_back(GetSubTileFromWorldPosition(agent_spawn_position_));
+		}
 
 		// Find Door
 		for(auto& door : doors_list_) {
@@ -686,6 +745,8 @@ void MapGrid::ResolvePath() {
 	}
 
 	resolve_path_ = true;
+
+	UpdateDebugVisualization();
 }
 
 
@@ -861,6 +922,7 @@ vec3 MapGrid::GenerateLayout(const int w, const int l, const int n, const int d)
 
 			if(!agent_placed && room_id == 1) {
 				agent_placed = true;
+				agent_spawn_ = true;
 				agent_center = tile_center;
 			}
 
@@ -1053,6 +1115,7 @@ void MapGrid::ResetMap() {
 	agent_spawn_position_ = vec2();
 
 	resolve_path_ = false;
+	agent_spawn_ = false;
 	map_ = nullptr;
 	wall_urdf_path_ = "";
 	unlocked_door_path_ = "";

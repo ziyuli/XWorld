@@ -2284,6 +2284,21 @@ void World::LoadMetadata(const char * filename)
         return;
     }
 
+    // Check goal
+    int goal_k = -1;
+    for (int i = 0; i < keys.size(); i++) {
+        if (!strcmp(keys[i], "goal")) {
+            goal_k = i;
+            break;
+        }
+    }
+
+    if (goal_k < 0) {
+        fprintf(stderr, "Did not find \"goal\" in header on line %d of %s\n",
+                line_number, filename);
+        return;
+    }
+
     char value_buffer[4096];
         while (fgets(value_buffer, 4096, fp)) {
         line_number++;
@@ -2322,15 +2337,22 @@ void World::LoadMetadata(const char * filename)
         int pickable_length = strlen(pickable);
         if (pickable_length == 0) continue;
 
+        const char *goal = values[goal_k];
+        if (!goal) continue;
+        int goal_length = strlen(goal);
+        if (goal_length == 0) continue;
+
         std::string rel_path(path);
         // std::string dir_str(filename);
         // size_t p = dir_str.find_last_of("/");
         // std::string abs_path(dir_str.substr(0, p) + std::string(path));
 
         bool pickable_bool = !strcmp(pickable, "0");
+        bool goal_bool = !strcmp(goal, "0");
 
         pickable_list_[std::string(tag)] = pickable_bool;
-        tag_list_[rel_path] = std::string(tag);        
+        tag_list_[rel_path] = std::string(tag);  
+        goal_list_.push_back(std::string(tag));
 
         //printf("[Object Category] %s %s %s %d\n", model_id, tag, rel_path.c_str(), pickable_bool);
     }
@@ -2525,8 +2547,16 @@ std::weak_ptr<RobotBase> World::LoadRobot(
                     robot_anim->TakeAction(1);
                 }
 
-           } else {
-                robot_anim->TakeAction(0);
+           } 
+           else if (auto robot_conv = std::dynamic_pointer_cast<RobotWithConvertion>(robot))
+           {
+                if(!robot_conv->GetCycle()) {
+                    robot_conv->SetCycle(true);
+                    robot_conv->TakeAction(0);
+                    robot_conv->SetCycle(false);
+                } else {
+                    robot_conv->TakeAction(0);
+                }
            }
 
             BulletStep();
