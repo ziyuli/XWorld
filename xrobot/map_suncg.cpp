@@ -349,7 +349,7 @@ void MapSuncg::LoadJSON(const char * houseFile, const char * input_data_director
 					if (state) sprintf(obj_name, "%s/object/%s/%s_0.obj", input_data_directory, modelId, modelId); 
 					else sprintf(obj_name, "%s/object/%s/%s.obj", input_data_directory, modelId, modelId); 
 					
-					//printf("%s\n", std::string(obj_name).c_str());
+					// printf("%s\n", std::string(all_labels_[modelId]).c_str());
 
 					float mass = 0.0f;
 					bool concave = true;

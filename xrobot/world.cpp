@@ -1707,7 +1707,7 @@ void RobotBase::TurnRight(const float speed) {
     }
 }
 
-void RobotBase::PickUp(std::shared_ptr<Inventory> inventory, 
+std::string RobotBase::PickUp(std::shared_ptr<Inventory> inventory, 
         const glm::vec3 from, const glm::vec3 to) {
 
     assert(inventory);
@@ -1736,15 +1736,19 @@ void RobotBase::PickUp(std::shared_ptr<Inventory> inventory,
 
                 inventory->PutObject(object);
 
+                return object->robot_data_.label_;
+
                 // printf("ok\n");
                 //scene_->map_bullet_label_.erase(
                 //        scene_->map_bullet_label_.find(temp_res[0].bullet_id));
             }
         }
     }
+
+    return "Nothing";
 }
 
-void RobotBase::PutDown(std::shared_ptr<Inventory> inventory, 
+std::string RobotBase::PutDown(std::shared_ptr<Inventory> inventory, 
         const glm::vec3 from, const glm::vec3 to) {
     
     assert(inventory);
@@ -1869,6 +1873,8 @@ void RobotBase::PutDown(std::shared_ptr<Inventory> inventory,
 
                                 bullet_world->SetTransformation(temp_obj, tr);
                                 bullet_world->BulletStep();
+
+                                return temp_obj->robot_data_.label_;
                             }
 
                         } else {
@@ -1879,9 +1885,11 @@ void RobotBase::PutDown(std::shared_ptr<Inventory> inventory,
             }
         }
     }
+
+    return "Nothing";
 }
 
-void RobotBase::RotateObject(const glm::vec3 rotate_angle,
+std::string RobotBase::RotateObject(const glm::vec3 rotate_angle,
     const glm::vec3 from, const glm::vec3 to) {
     
     // assert(glm::dot(from, glm::vec3(0,0,0)) != 0.0f);
@@ -1906,9 +1914,13 @@ void RobotBase::RotateObject(const glm::vec3 rotate_angle,
                 tr.setRotation(btQuaternion(rotate_angle.x, rotate_angle.y, rotate_angle.z));
                 bullet_world->SetTransformation(temp_obj, tr);
                 bullet_world->BulletStep();
+
+                return temp_obj->robot_data_.label_;
             }
         }
     }
+
+    return "Nothing";
 }
 
 void RobotBase::DetachObject()

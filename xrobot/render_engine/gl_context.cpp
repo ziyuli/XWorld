@@ -151,6 +151,19 @@ EGLContext::EGLContext(int h, int w, int device): GLContext{h, w, device} {
         exit(1);
     }
     checkError(succ);
+
+    // Debug
+    // int NumberOfExtensions;
+    // glGetIntegerv(GL_NUM_EXTENSIONS, &NumberOfExtensions);
+
+    // printf("--------------------------------------------\n");
+    // printf("NumberOfExtensions: %d\n", NumberOfExtensions);
+
+    // for(int i=0; i<NumberOfExtensions; i++) {
+    //     const GLubyte *ccc=glGetStringi(GL_EXTENSIONS, i);
+    //     printf("  %s\n", ccc);
+    // }
+
     this->Init();
 }
 
@@ -477,7 +490,7 @@ GLFWContext::GLFWContext(int h, int w, bool core) :
     
     GLFWContext::x_ = w / 2;
     GLFWContext::y_ = h / 2;
-    
+
     this->Init();
 }
 

@@ -437,11 +437,11 @@ public:
     virtual void MoveBackward(const float speed);
     virtual void TurnLeft(const float speed);
     virtual void TurnRight(const float speed);
-    virtual void PickUp(std::shared_ptr<Inventory> inventory,
+    virtual std::string PickUp(std::shared_ptr<Inventory> inventory,
             const glm::vec3 from, const glm::vec3 to);
-    virtual void PutDown(std::shared_ptr<Inventory> inventory, 
+    virtual std::string PutDown(std::shared_ptr<Inventory> inventory, 
             const glm::vec3 from, const glm::vec3 to);
-    virtual void RotateObject(const glm::vec3 rotate_angle,
+    virtual std::string RotateObject(const glm::vec3 rotate_angle,
             const glm::vec3 from, const glm::vec3 to);
     virtual void AttachObject(std::weak_ptr<RobotBase> object, const int id = -1);
     virtual void DetachObject();

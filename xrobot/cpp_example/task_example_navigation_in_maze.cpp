@@ -34,8 +34,8 @@ namespace xrobot
 		// Adjust Lighting
 		renderer_->sunlight_.ambient = glm::vec3(0.05,0.05,0.05);
 		renderer_->lighting_.use_ssr = false;
-        renderer_->lighting_.exposure = 0.4f;
-        renderer_->lighting_.indirect_strength = 0.2f;
+        renderer_->lighting_.exposure = 1.5f;
+        renderer_->lighting_.indirect_strength = 0.35f;
 
         // Reset
         iterations_ = 0;
@@ -44,8 +44,9 @@ namespace xrobot
 		// Load Assets
 		scene_->world_->LoadMetadata(test_meta.c_str());
 		scene_->world_->AssignTag(apple, "apple");
-		scene_->CreateAndLoadTileURDF(test_floor);
-		scene_->LoadWallURDF(test_wall);
+		scene_->CreateAndLoadTileURDF(floor_0);
+		scene_->CreateAndLoadTileURDF(floor_1);
+		scene_->LoadWallURDF(wall);
 		scene_->CreateAndLoadKeyURDF(key_red, "red");
 		scene_->CreateAndLoadKeyURDF(key_blue, "blue");
 		scene_->CreateAndLoadKeyURDF(key_yellow, "yellow");

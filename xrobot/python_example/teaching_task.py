@@ -1,6 +1,12 @@
 import cv2
 import numpy as np
 import random
+from math import cos
+from math import acos
+from math import sin
+from math import asin
+from math import copysign
+from math import sqrt
 from context_free_grammar import CFG
 
 class XWorld3DTask(object):
@@ -15,7 +21,30 @@ class XWorld3DTask(object):
 
 	performance_window_size = 200
 
+	PI = 3.1415926
+	PI_2 = PI / 2    # 90
+	PI_4 = PI / 4    # 45
+	PI_8 = PI / 8    # 22.5
+	PI_12 = PI / 12  # 15
+
 	def __init__(self, env):
+
+		self.directions = {
+			( self.PI_2-self.PI_8,  self.PI_2+self.PI_8)    : "right",
+			(-self.PI_2-self.PI_8, -self.PI_2+self.PI_8)    : "left",
+			(          -self.PI_8,            self.PI_8)    : "front",
+			# two intervals of "behind" cannot be merged, so we need to specify
+			# them separately
+			(   self.PI-self.PI_8,              self.PI)    : "behind",
+			(            -self.PI,   -self.PI+self.PI_8)    : "behind",
+			(           self.PI_8,  self.PI_4+self.PI_8)    : "front-right",
+			( self.PI_2+self.PI_8,    self.PI-self.PI_8)    : "behind-right",
+			(-self.PI_2+self.PI_8,           -self.PI_8)    : "front-left",
+			(  -self.PI+self.PI_8, -self.PI_2-self.PI_8)    : "behind-left"
+		}
+		self.orientation_threshold = self.PI_4
+		self.distance_threshold = 1.0
+
 		self.env = env
 		self.event = ""
 		self.cfg = CFG(*self._define_grammar())
@@ -31,6 +60,27 @@ class XWorld3DTask(object):
 		self.steps_in_cur_task = 0
 		self.answer = ""
 		self.env.Clear()
+
+	def _get_direction_and_distance(self, p1, p2, p1_yaw=None):
+		dx = p2[0] - p1[0]
+		dy = p2[2] - p1[2]
+		dist = sqrt(dx ** 2 + dy ** 2)
+		if p1_yaw is None:
+			return dist
+		if dist == 0:
+			return 0, 0, ""
+		else:
+			v1 = (cos(p1_yaw), sin(p1_yaw))
+			v2 = (dx / dist, dy / dist)
+			# theta is the angle from p2 to p1 wrt p1's orientation
+			cos_theta = max(-1, min(1, v1[0]*v2[0] + v1[1]*v2[1]))
+			sin_theta = max(-1, min(1, v1[1]*v2[0] - v1[0]*v2[1]))
+			theta = acos(cos_theta) * copysign(1, asin(sin_theta))
+			direction = ""
+			for r in self.directions.keys():
+				if (theta >= r[0] and theta < r[1]):
+					direction = self.directions[r]
+			return theta, dist, direction
 
 	def __record_result(self, res):
 		self.success_seq.append(res)
@@ -48,10 +98,7 @@ class XWorld3DTask(object):
 		self.num_failures += 1
 
 	def _record_env_usage(self):
-
-		print "_record_env_usage"
-		# self.env.record_environment_usage(
-		# 	self.__class__.__name__, self.success_seq)
+		print ""
 
 	def _time_reward(self):
 		reward = XWorld3DTask.time_penalty
@@ -79,6 +126,11 @@ class XWorld3DTask(object):
 		self._bind("S -> correct")
 		self.sentence = self._generate()
 		return reward
+
+	# TODO
+	def _reach_object(self, agent, yaw, object):
+		theta, dist, _ = self._get_direction_and_distance(agent, object, yaw)
+		return (abs(theta) < self.orientation_threshold) and abs(dist) < self.distance_threshold
 
 	def _record_answer(self, answer):
 		self.answer = answer
@@ -145,14 +197,11 @@ class XWorld3DTask(object):
 		image_rgbd = cv2.cvtColor(image_rgbd, cv2.COLOR_BGRA2RGBA)
 		image_rgbd = cv2.flip(image_rgbd, 0)
 
-		image_rgbd_resize = cv2.resize(image_rgbd, None, fx=0.75, fy=0.75)
+		image_rgbd_resize = cv2.resize(image_rgbd, None, fx=0.8, fy=0.8)
 		image_rgb = np.array(image_rgbd_resize[:,:,:3])
 
-		# frames = "frames: " + str(self.env.GetStatus()["frames"])
-		# framerate = " | framerate: " + str(self.env.GetStatus()["framerate"])
-
 		cv2.putText(image_rgb, sentence, (30,30), \
-			cv2.FONT_HERSHEY_PLAIN, 1, (200,250,250), 1);
+			cv2.FONT_HERSHEY_PLAIN, 0.9, (15,15,15), 1, cv2.LINE_AA);
 
 		cv2.imshow("RGB", image_rgb)
 
@@ -169,7 +218,6 @@ class Task(object):
 		self.current_stage = self.stages[self.current_stage]()[0]
 
 	# def obtain_performance(self):
-
 
 	def register_stage(self, stage_name, func):
 		self.stages[stage_name] = func

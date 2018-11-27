@@ -268,12 +268,12 @@ bool MapGrid::SpawnSingleObject(const std::string& path, const int roomgroup_id)
 
 bool MapGrid::SpawnPairOfObjects(const std::string& left_path, 
 						 		 const std::string& right_path, 
-					     		 const int num, const int roomgroup_id) {
+					     		 const int roomgroup_id) {
 	int left_id = FindObject(left_path);
 	int right_id = FindObject(right_path);
 	assert(left_id > -1 && right_id > -1);
 
-	return SpawnPairOfObjects(left_id, right_id, num, roomgroup_id);
+	return SpawnPairOfObjects(left_id, right_id, roomgroup_id);
 }
 
 bool MapGrid::SpawnStackOfObjects(const std::string& top_path, 
@@ -389,24 +389,140 @@ bool MapGrid::SpawnSingleObject(const int obj_id, const int roomgroup_id) {
 	return false;
 }
 
+vec2 MapGrid::GetASpaceNearPosition(const vec2 position, const float radius) {
+	assert(radius > 0.0f);
+
+	constexpr float sqrt2 = 1.41421f;
+	constexpr float padding = 0.01f;
+
+	const vec2 offset_raw[8] = { 
+		vec2(0, 1),
+		vec2(sqrt2, sqrt2),
+		vec2(1, 0),
+		vec2(sqrt2, -sqrt2),
+		vec2(0, -1),
+		vec2(-sqrt2, -sqrt2),
+		vec2(-1, 0),
+		vec2(-sqrt2, sqrt2)
+	};
+	std::vector<vec2> offset(offset_raw, offset_raw + sizeof(offset_raw) / sizeof(vec2));
+
+	std::random_shuffle(offset.begin(), offset.end());
+
+	// TODO
+	// Use Bounding Sphere Instead Of AABB
+	
+	float bbox_half_width = radius / sqrt2;
+	BBox b(
+		vec2(-bbox_half_width, -bbox_half_width),
+		vec2( bbox_half_width,  bbox_half_width)
+	);
+
+	vec2 res(-1000, -1000);
+
+	for (int i = 0; i < 8; ++i) {
+
+		vec2 offset_vector = position + ((radius + padding) * offset[i]);
+		BBox b_offset = b.Offset(offset_vector);
+
+		if(IntersectWithBBox(b_offset)) {
+			res = offset_vector;
+			break;
+		}
+	}
+
+	return res;
+}
+
 bool MapGrid::SpawnPairOfObjects(const int left_id, const int right_id, 
-							     const int num, const int roomgroup_id) {
+							     const int roomgroup_id) {
 	const int max_attemps_left = 4;
-	const int max_attemps_right = 4;
-	const int max_distance = 3; // subtile's width x 3
+	const float min_distance = 2.0;
+	const float max_distance = 4.0;
+	const bool need_empty_space = true;
 
 	int num_attempts_left = 0;
 	bool found_left = false;
 	while(num_attempts_left++ < max_attemps_left && !found_left) {
-		found_left = SpawnSingleObject(bottom_id, roomgroup_id);
+		found_left = SpawnSingleObject(left_id, roomgroup_id);
 	}
 
-	if(found_bottom) {
-		auto& pile = pile_list_.back();
-		auto& bbox = pile.bbox;
+	if(found_left) {
+		auto pile = pile_list_.back();
+		vec2 bbox_center = pile.bbox.Center();
+		float bbox_bounding_sphere = pile.bbox.BoundingSphereRadius();
+		float min_distance_w_sph = min_distance + bbox_bounding_sphere;
+		float max_distance_w_sph = max_distance + bbox_bounding_sphere;
+
+		int tile_room_id = -1;
+		auto subtile_sptr = GetSubTileFromWorldPosition(bbox_center);
+		if(subtile_sptr) {
+			if(auto tile_sptr = subtile_sptr->parent.lock()) {
+				tile_room_id = tile_sptr->room_id;
+			} 
+		}
 
 
+		std::vector<std::shared_ptr<SubTile>> subtiles_candidates;
+		if(tile_room_id > -1) {
+			auto& tiles = rooms_[tile_room_id - 1].tiles;
+			for(auto& tile : tiles) {
+				for(auto& subtile : tile->subtiles) {
+					float dist = glm::distance(subtile->center, bbox_center);
+					if(!subtile->occupied && 
+					   dist > min_distance_w_sph &&
+					   dist < max_distance_w_sph) {
+						subtiles_candidates.push_back(subtile);
+					} else if(need_empty_space &&
+							  dist <= min_distance_w_sph) {
+						subtile->occupied = true;
+						tile->occupied = true;
+					}
+				}
+			}
+		}
 
+		std::random_shuffle(subtiles_candidates.begin(),
+						    subtiles_candidates.end());
+
+		BBox object_bbox = object_bbox_list_[right_id];
+
+		int max_attemps_right = max(8, (int)(subtiles_candidates.size() * 0.4));
+		int num_attempts_right = 0;
+		bool found_right = false;
+		while(subtiles_candidates.size() && 
+			  num_attempts_right++ < max_attemps_right &&
+			  !found_right) 
+		{
+			auto select_subtile_ptr = subtiles_candidates.front();
+			vec2 select_subtile_center = select_subtile_ptr->center;
+			BBox object_bbox_offset = object_bbox.Offset(select_subtile_center);
+			if(IntersectWithBBox(object_bbox_offset)) {
+				found_right = true;
+
+				float height_min = object_height_list_[right_id].x;
+
+				vec3 point(select_subtile_center.x,
+				           -height_min + kPadding,
+				           select_subtile_center.y);
+
+				select_subtile_ptr->occupied = true;
+
+				if(auto select_tile_sptr = select_subtile_ptr->parent.lock()) {
+					select_tile_sptr->occupied = true;
+				}
+
+				bbox_list_.push_back(object_bbox_offset);
+
+				Pile p;
+				p.object_id_list.push_back(right_id);
+				p.positions.push_back(point);
+				p.bbox = object_bbox_offset;
+				pile_list_.push_back(p);
+			} else {
+				subtiles_candidates.erase(subtiles_candidates.begin());
+			}
+		}
 	}
 
 	return false;

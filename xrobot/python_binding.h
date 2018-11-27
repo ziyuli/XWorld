@@ -120,7 +120,6 @@ struct Range {
 	boost::python::tuple GetMax() const { return vec2tuple(max); }
 };
 
-
 // Thing hold object or robot in playground
 class Thing {
 public:
@@ -135,7 +134,11 @@ public:
 
 	// Return the label
 	std::string GetLabel();
-	
+
+	// Return properities
+	std::string GetProPerties() =delete;
+
+
 	long __hash__() { return (long) (uintptr_t) robot_.lock().get(); }
 	bool __eq__(const Thing& other) { 
 		return robot_.lock().get() == other.robot_.lock().get();
@@ -153,6 +156,17 @@ private:
 	boost::python::tuple orientation_;
 	std::weak_ptr<RobotBase> robot_;
 };
+
+// class Agent : public Thing {
+// public:
+// 	Agent();
+
+// 	float GetYaw() const;
+// 	float GetPitch() const;
+
+// private:
+// 	std::shared_ptr<Playground> scene_;
+// };
 
 // NavAgent hold a object with navigation functionality
 class NavAgent {
@@ -289,8 +303,8 @@ public:
 
 	// Generate a empty scene with checkerboard style floors and walls
 	//
-	// Default size is 5x5 (10m x 10m)
-	void CreateAnTestScene();
+	// Default size is 5x5 (25m x 25m)
+	void CreateArena(const int width = 5, const int length = 5);
 
 	// Generate a empty SUNCG scene
 	void CreateSceneFromSUNCG();
@@ -316,6 +330,8 @@ public:
 	boost::python::list LocatePositionInGrid(const float x, const float z);
 	boost::python::list GetRoomVisitSequence();
 	boost::python::list GetRoomGroups();
+	boost::python::list GetSpaceNearPosition(const boost::python::list position,
+										     const float radius);
 	boost::python::list LoadSceneConfigure(const int w, const int l, 
 										   const int n, const int d);
 	void LoadBasicObjects(const boost::python::list doors,
@@ -326,7 +342,8 @@ public:
 						  const boost::python::list tiles);
 	void LoadModels(const boost::python::list models,
 					const boost::python::list tags);
-	void SpawnModels(const boost::python::dict conf);
+	void SpawnModelsConf(const boost::python::dict conf);
+	void SpawnModels();
 
 	void ResolvePath();
 
@@ -395,6 +412,7 @@ public:
 	boost::python::tuple GetCameraFront() const;
 	boost::python::tuple GetCameraRight() const;
 	boost::python::tuple GetCameraUp() const;
+	float GetCameraYaw() const;
 
 	// Capture Size
 	int GetWidth() const { return w_; }
@@ -434,10 +452,10 @@ public:
 	void LookDown();
 
 	// Pick up the object in the center of camera (also with in 3 unit length)
-	void Grasp();
+	std::string Grasp();
 
 	// Put down the object in the center of camera (also with in 3 unit length)
-	void PutDown();
+	std::string PutDown();
 
 	// Attach or stick the object root base at the center of camera (also with in 3 unit length)
 	void Attach();
@@ -446,7 +464,7 @@ public:
 	void Detach();
 
 	// Rotate an object a certain degree angles
-	void Rotate(const boost::python::list angle_py);
+	std::string Rotate(const boost::python::list angle_py);
 
 	// Teleport an object or robot to a certain position in scene
 	void Teleport(Thing object, const boost::python::list position_py);
@@ -482,6 +500,8 @@ public:
 
 	bool UseObject(const int inventory_id);
 
+	boost::python::list QueryLastEvent();
+
 	// Check Contact
 	bool QueryContact(Thing& object);
 
@@ -493,6 +513,7 @@ public:
 	// This will use ray-cast to test ray intersection with object 
 	// concave or convex hull
 	bool QueryObjectWithLabelAtCameraCenter(const std::string& label);
+	bool QueryObjectsAtCameraCenter(boost::python::list objects) =delete;
 
 	// Query a certain object is at forward
 	//
@@ -507,6 +528,9 @@ public:
 
 	// Return a list contains all object with certain label
 	boost::python::list QueryObjectByLabel(const std::string& label);
+
+	boost::python::list QueryObjectNearObject(Thing& object, 
+		const bool exlude = true, const float dist = 2.0f);
 
 	// Get the framerate, rendered frames count and cache information
 	boost::python::dict GetStatus() const;
@@ -532,6 +556,7 @@ private:
 	int iterations_;
 	float camera_aspect_;
 	float camera_pitch_;
+	float camera_yaw_;
 	
 	bool kill_after_arrived_;
 	bool gameover_;
@@ -541,6 +566,7 @@ private:
 
 	boost::python::list current_actions_;
 	boost::python::list current_objects_;
+	boost::python::list current_event_;
 
 	std::shared_ptr<Map> scene_;
 	std::shared_ptr<Inventory> inventory_;
@@ -577,6 +603,12 @@ BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(TurnLeft_member_overloads,
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(TurnRight_member_overloads, 
 									   Playground::TurnRight, 0, 1)
 
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(QueryObjectNearObject_member_overloads, 
+									   Playground::QueryObjectNearObject, 1, 3)
+
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(CreateArena_member_overloads, 
+									   Playground::CreateArena, 0, 2)
+
 BOOST_PYTHON_MODULE(libxrobot)
 {
 	using namespace boost::python;
@@ -607,6 +639,12 @@ BOOST_PYTHON_MODULE(libxrobot)
 	;
 
 	class_<Playground>("Playground", init<int,int,optional<int,int,int>>())
+
+	.def("CreateArena", &Playground::CreateArena,
+		CreateArena_member_overloads(
+			args("width", "length"), "dimension"
+		)
+	)
 
 	.def("EnableInventory", &Playground::EnableInventory,
 		EnableInventory_member_overloads(
@@ -650,6 +688,15 @@ BOOST_PYTHON_MODULE(libxrobot)
 		)
 	)
 
+	.def("QueryObjectNearObject", &Playground::QueryObjectNearObject,
+		QueryObjectNearObject_member_overloads(
+			args("near"), "dist"
+		)
+	)
+
+	.def("QueryLastEvent", &Playground::QueryLastEvent)
+	.def("GetCameraYaw", &Playground::GetCameraYaw)
+	.def("GetSpaceNearPosition", &Playground::GetSpaceNearPosition)
 	.def("ResolvePath", &Playground::ResolvePath)
 	.def("GetGoals", &Playground::GetGoals)
 	.def("LocatePositionInGrid", &Playground::LocatePositionInGrid)
@@ -676,11 +723,11 @@ BOOST_PYTHON_MODULE(libxrobot)
 	.def("AssignNavigationAgentTarget", &Playground::AssignNavigationAgentTarget)
 	.def("SpawnNavigationAgent", &Playground::SpawnNavigationAgent)
 	.def("Clear", &Playground::Clear)
-	.def("CreateAnTestScene", &Playground::CreateAnTestScene)
 	.def("CreateSceneFromSUNCG", &Playground::CreateSceneFromSUNCG)
 	.def("CreateRandomGenerateScene", &Playground::CreateRandomGenerateScene)
 	.def("LoadSceneConfigure", &Playground::LoadSceneConfigure)
 	.def("SpawnModels", &Playground::SpawnModels)
+	.def("SpawnModelsConf", &Playground::SpawnModelsConf)
 	.def("LoadModels", &Playground::LoadModels)
 	.def("AttachCameraTo", &Playground::AttachCameraTo)
 	.def("FreeCamera", &Playground::FreeCamera)
