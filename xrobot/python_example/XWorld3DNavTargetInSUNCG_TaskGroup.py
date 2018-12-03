@@ -7,9 +7,9 @@ from XWorld3DNavTargetInSUNCG import *
 
 class XRobotEnv(object):
     def __init__(self):
-        self.env = Playground(640, \
-                              360, \
-		                      HEADLESS, \
+        self.env = Playground(480, \
+                              480, \
+		                      DEBUG_VISUALIZATION, \
                               RENDER_QUALITY_NORMAL, \
                               1)
 

@@ -27,7 +27,7 @@ uniform vec3 urdf_color = vec3(1,1,1);
 
 // MTL
 uniform vec3 kA = vec3(0.0);
-uniform vec3 kD = vec3(1,0,0);
+uniform vec3 kD = vec3(0,0,0);
 uniform vec3 kS = vec3(1,0,0);
 uniform float d = 1;
 uniform float Ns = 1;
@@ -54,16 +54,39 @@ void main()
 
     vec4 diffuse_tex = texture(texture_diffuse0, fs_in.TexCoords).rgba;
 
-    vec3 diffuse;
-    float alpha;
+    // vec3 diffuse;
+    // float alpha;
 
-    if(diffuseMap > 0)
+    // if(diffuseMap > 0)
+    // {
+    //     diffuse = kD * diffuse_tex.rgb;
+    // }
+    // else
+    // {
+    //     diffuse = kD;// * urdf_color;
+    // }
+
+    vec3 diffuse = urdf_color;
+    float alpha = 0;
+    vec4 tex_color;
+
+    if(diffuseMap == 1)
     {
-        diffuse = kD * diffuse_tex.rgb;
+        tex_color = texture(texture_diffuse0, fs_in.TexCoords);
+        diffuse = tex_color.rgb;
+        alpha = tex_color.a;
+    
+        if(lum(kD) > 0.005)
+        {
+            diffuse = kD * tex_color.rgb;
+        }
     }
     else
     {
-        diffuse = kD * urdf_color;
+        if(max3(kD) > 0.005)
+        {
+            diffuse = kD;
+        }
     }
 
     alpha = min(diffuse_tex.a, d);
@@ -73,7 +96,6 @@ void main()
         discard;
     }
 
-    
     vec3 I = normalize(fs_in.FragPos - camPos);
     vec3 N = normalize(fs_in.Normal);
     vec3 L = normalize(light_directional);
@@ -82,7 +104,7 @@ void main()
 
     // Blinn-Phong
     float NdotH = dot(N, H);
-    float specular = pow(clamp(NdotH, 0, 1), Ns) * 0.3;
+    float specular = pow(clamp(NdotH, 0, 1), Ns) * 0.1;
     if(Ns < 0.01) specular = 0;
 
     // Lambert

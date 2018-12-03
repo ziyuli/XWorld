@@ -17,6 +17,7 @@ class XWorld3DNavTargetInSUNCG(XWorld3DTask):
 
 	def idle(self):
 		self.reset()
+		self.env.SetLighting({ "ssr": True })
 		self.env.CreateSceneFromSUNCG()
 		self.env.LoadSUNCG(suncg_house0, suncg_meta, suncg_dir)
 
@@ -38,7 +39,7 @@ class XWorld3DNavTargetInSUNCG(XWorld3DTask):
 		reward, time_out = self._time_reward()
 		next_stage = "navigation"
 
-		super(XWorld3DNavTargetInSUNCG, self).display_rgb(self.sentence)
+		super(XWorld3DNavTargetInSUNCG, self).display_rgb(self.sentence,480,480)
 
 		if not time_out:
 			if self.env.QueryObjectWithLabelAtCameraCenter(self.target):

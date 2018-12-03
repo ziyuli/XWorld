@@ -535,6 +535,8 @@ public:
 	// Get the framerate, rendered frames count and cache information
 	boost::python::dict GetStatus() const;
 
+	void HighlightCenter(const bool mode);
+
 
 	// Debug and Unfinished Member Functions
 	//
@@ -558,6 +560,7 @@ private:
 	float camera_pitch_;
 	float camera_yaw_;
 	
+	bool highlight_objects_;
 	bool kill_after_arrived_;
 	bool gameover_;
 	bool interact_;
@@ -694,6 +697,7 @@ BOOST_PYTHON_MODULE(libxrobot)
 		)
 	)
 
+	.def("HighlightCenter", &Playground::HighlightCenter)
 	.def("QueryLastEvent", &Playground::QueryLastEvent)
 	.def("GetCameraYaw", &Playground::GetCameraYaw)
 	.def("GetSpaceNearPosition", &Playground::GetSpaceNearPosition)
@@ -791,6 +795,7 @@ BOOST_PYTHON_MODULE(libxrobot)
 	scope().attr("RENDER_QUALITY_LOW")     = render_engine::kLowQuality;
 	scope().attr("RENDER_QUALITY_NORMAL")  = render_engine::kNormalQuality;
 	scope().attr("RENDER_QUALITY_HIGH")    = render_engine::kHighQuality;
+	scope().attr("RENDER_QUALITY_HIGH_BAKE")    = render_engine::kVeryHighQuality;
 }
 
 #endif // PLAYGROUND_PY_H_

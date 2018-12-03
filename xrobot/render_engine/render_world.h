@@ -94,7 +94,8 @@ public:
                     world_max_x_( 2),
                     world_max_z_( 2),
                     debug_subtiles_(0),
-                    debug_subtile_status_(0) {}
+                    debug_subtile_status_(0),
+                    highlight_center_(-1) {}
 
     virtual size_t size() const = 0;
 
@@ -117,6 +118,12 @@ public:
         max_x = world_max_x_;
         max_z = world_max_z_;
     }
+
+    void set_highlight_center(const int highlight) {
+        highlight_center_ = highlight;
+    }
+
+    int get_highlight_center() const { return highlight_center_; }
 
     virtual const RenderBody* render_body_ptr(const size_t i) const = 0;
  
@@ -153,6 +160,8 @@ protected:
     float world_min_z_;
     float world_max_x_;
     float world_max_z_;
+
+    int highlight_center_;
 
 // DEBUG
 public:

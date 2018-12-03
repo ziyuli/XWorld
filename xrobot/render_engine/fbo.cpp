@@ -6,7 +6,7 @@ namespace render_engine {
 FBO::FBO(GLuint w,
          GLuint h,
          bool depthBuffer,
-         bool sigBuffer,
+         bool color1Buffer,
          GLenum magFilter,
          GLenum minFilter,
          GLint internalFormat,
@@ -15,18 +15,16 @@ FBO::FBO(GLuint w,
 	this->width = w;
 	this->height = h;
 	this->needDepthBuffer = depthBuffer;
-    this->needSigBuffer = sigBuffer;
+    this->needColor1Buffer = color1Buffer;
 
 	GLint previousFrameBuffer;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFrameBuffer);
 
-
 	glGenFramebuffers(1, &frameBuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
 
-	glGenTextures(1, &textureColorBuffer);
-	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-
+	glGenTextures(1, &textureColor0Buffer);
+	glBindTexture(GL_TEXTURE_2D, textureColor0Buffer);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
@@ -45,13 +43,12 @@ FBO::FBO(GLuint w,
 	glFramebufferTexture2D(GL_FRAMEBUFFER,
                            GL_COLOR_ATTACHMENT0,
                            GL_TEXTURE_2D,
-                           textureColorBuffer,
+                           textureColor0Buffer,
                            0);
 
 	if (depthBuffer == false) {
 		glGenRenderbuffers(1, &rbo);
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-        // Use a single rbo for both depth and stencil buffer.
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
 		glFramebufferRenderbuffer(
                 GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
@@ -82,9 +79,9 @@ FBO::FBO(GLuint w,
                                0);
 	}
     
-    if (sigBuffer) {
-        glGenTextures(1, &textureSigBuffer);
-        glBindTexture(GL_TEXTURE_2D, textureSigBuffer);
+    if (color1Buffer) {
+        glGenTextures(1, &textureColor1Buffer);
+        glBindTexture(GL_TEXTURE_2D, textureColor1Buffer);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
@@ -101,7 +98,7 @@ FBO::FBO(GLuint w,
         glFramebufferTexture2D(GL_FRAMEBUFFER,
                                GL_COLOR_ATTACHMENT1,
                                GL_TEXTURE_2D,
-                               textureSigBuffer,
+                               textureColor1Buffer,
                                0);
         
         unsigned int attach[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
@@ -117,24 +114,24 @@ FBO::FBO(GLuint w,
 }
 
 FBO::~FBO() {
-	glDeleteTextures(1, &textureColorBuffer);
+	glDeleteTextures(1, &textureColor0Buffer);
 	glDeleteFramebuffers(1, &frameBuffer);
 	if (needDepthBuffer == false) {
         glDeleteRenderbuffers(1, &rbo);
     } else {
         glDeleteTextures(1, &textureDepthBuffer);
     }
-    if (needSigBuffer) {
-        glDeleteTextures(1, &textureSigBuffer);
+    if (needColor1Buffer) {
+        glDeleteTextures(1, &textureColor1Buffer);
     }
 }
 
-void FBO::ActivateSgAsTexture(const int shaderProgram,
-                              const std::string& glSamplerName,
-                              const int textureUnit) {
-    if (!this->needSigBuffer) { return; }
+void FBO::ActivateColor1AsTexture(const int shaderProgram,
+                                  const std::string& glSamplerName,
+                                  const int textureUnit) {
+    if (!this->needColor1Buffer) { return; }
     glActiveTexture(GL_TEXTURE0 + textureUnit);
-    glBindTexture(GL_TEXTURE_2D, textureSigBuffer);
+    glBindTexture(GL_TEXTURE_2D, textureColor1Buffer);
     GLuint loc = glGetUniformLocation(shaderProgram, glSamplerName.c_str());
     glUniform1i(loc, textureUnit);
 }
@@ -144,7 +141,7 @@ void FBO::ActivateAsTexture(const int shaderProgram,
                             const std::string& glSamplerName,
                             const int textureUnit) {
 	glActiveTexture(GL_TEXTURE0 + textureUnit);
-	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+	glBindTexture(GL_TEXTURE_2D, textureColor0Buffer);
     GLuint loc = glGetUniformLocation(shaderProgram, glSamplerName.c_str());
 	glUniform1i(loc, textureUnit);
 }

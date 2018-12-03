@@ -116,10 +116,10 @@ namespace xrobot
         	glm::vec3 aabb_min = temp[i].aabb_min - glm::vec3(1);
         	glm::vec3 aabb_max = temp[i].aabb_max + glm::vec3(1);
 
-        	if(aabb_min.x < main_camera_->Position.x &&
-        	   aabb_max.x > main_camera_->Position.x && 
-        	   aabb_min.z < main_camera_->Position.z &&
-        	   aabb_max.z > main_camera_->Position.z) 
+        	if(aabb_min.x < main_camera_->position_.x &&
+        	   aabb_max.x > main_camera_->position_.x && 
+        	   aabb_min.z < main_camera_->position_.z &&
+        	   aabb_max.z > main_camera_->position_.z) 
         	{
         		return "idle";
         	}

@@ -15,26 +15,15 @@ class FBO {
 public:
 	GLuint width;
     GLuint height;
-
 	GLuint frameBuffer;
 
-	GLuint textureColorBuffer;
-    GLuint textureDepthBuffer;
-    GLuint textureSigBuffer;
-
-    GLuint rbo;
-    
-	GLuint attachement;
-
 	bool needDepthBuffer;
+    bool needColor1Buffer;
 
-    bool needSigBuffer;
-
-public:
     FBO(GLuint w,
         GLuint h,
         bool depthBuffer = false,
-        bool sigBuffer = false,
+        bool color1Buffer = false,
 		GLenum magFilter = GL_NEAREST,
         GLenum minFilter = GL_NEAREST,
 		GLint internalFormat = GL_RGBA,
@@ -51,10 +40,15 @@ public:
                                 const std::string& glSamplerName,
                                 const int textureUnit = 0);
 
-	void ActivateSgAsTexture(const int shaderProgram,
+	void ActivateColor1AsTexture(const int shaderProgram,
                              const std::string& glSamplerName,
                              const int textureUnit = 0);
-    
+    private:
+        GLuint textureColor0Buffer;
+        GLuint textureColor1Buffer;
+        GLuint textureDepthBuffer;
+        GLuint rbo;
+        GLuint attachement;
 };
 
 } } // xrobot::render_engine

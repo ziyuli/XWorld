@@ -140,5 +140,5 @@ void main()
     vec2 se = m + vec2( 1.0 / res.x,-1.0f / res.y);
 
     FragColor = texture(ssao, TexCoords).r * vec3(fxaa(src, TexCoords.xy * res, res, nw, ne, sw, se, m));
-    //FragColor = texture(ssao, TexCoords).r * vec3(1) * texture(src, TexCoords).rgb;
+    // FragColor = texture(ssao, TexCoords).r * vec3(1) * texture(src, TexCoords).rgb;
 }  

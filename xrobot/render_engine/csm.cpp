@@ -81,7 +81,7 @@ void CSM::initialize(float lambda, float near_offset, int split_count, int shado
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, m_shadow_maps[i], 0);
 	}
 
-	float camera_fov = camera->Zoom;
+	float camera_fov = camera->GetFOV();
 	float width = _width;
 	float height = _height;
 	float ratio = width / height;
@@ -100,7 +100,7 @@ void CSM::initialize(float lambda, float near_offset, int split_count, int shado
 
 	update(camera, dir);
 
-	// FIX
+	// TODO
 	// Unbind the buffers!
 	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//glBindTexture(GL_TEXTURE_2D, 0);
@@ -123,11 +123,11 @@ void CSM::update(Camera* camera, glm::vec3 dir)
 	dir = glm::normalize(dir);
 	m_light_direction = dir;
 
-	glm::vec3 center = camera->Position + camera->Front * 50.0f;
-	glm::vec3 light_pos = center - dir * ((camera->Far - camera->Near) / 2.0f);
+	glm::vec3 center = camera->position_ + camera->front_ * camera->GetFar();
+	glm::vec3 light_pos = center - dir * ((camera->GetFar() - camera->GetNear()) / 2.0f);
 	glm::vec3 right = glm::cross(dir, glm::vec3(0.0f, 1.0f, 0.0f));
 
-	glm::vec3 up = m_stable_pssm ? camera->Up : camera->Right;
+	glm::vec3 up = m_stable_pssm ? camera->up_ : camera->right_;
 
 	glm::mat4 modelview = glm::lookAt(light_pos, center, up);
 
@@ -142,8 +142,8 @@ void CSM::update(Camera* camera, glm::vec3 dir)
 
 void CSM::update_splits(Camera* camera)
 {
-	float nd = camera->Near;
-	float fd = camera->Far;
+	float nd = camera->GetNear();
+	float fd = camera->GetFar();
 
 	float lambda = m_lambda;
 	float ratio = fd / nd;
@@ -165,8 +165,8 @@ void CSM::update_splits(Camera* camera)
 
 void CSM::update_frustum_corners(Camera* camera)
 {
-	glm::vec3 center = camera->Position;
-	glm::vec3 view_dir = camera->Front;
+	glm::vec3 center = camera->position_;
+	glm::vec3 view_dir = camera->front_;
 
 	glm::vec3 up(0.0f, 1.0f, 0.0f);
 	glm::vec3 right = glm::cross(view_dir, up);
@@ -286,7 +286,7 @@ void CSM::update_crop_matrices(glm::mat4 t_modelview, Camera* camera)
 
 			// Add the near offset to the Z value of the cascade extents to make sure the orthographic frustum captures the entire frustum split (else it will exhibit cut-off issues).
 			glm::mat4 ortho = glm::ortho(min.x, max.x, min.y, max.y, -m_near_offset, m_near_offset + cascade_extents.z);
-			glm::mat4 view = glm::lookAt(shadow_camera_pos, t_frustum.center, camera->Up);
+			glm::mat4 view = glm::lookAt(shadow_camera_pos, t_frustum.center, camera->up_);
 
 			m_proj_matrices[i] = ortho;
 			m_crop_matrices[i] = ortho * view;

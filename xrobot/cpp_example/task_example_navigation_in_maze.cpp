@@ -32,10 +32,10 @@ namespace xrobot
 	std::string Task_NavToObject::Start() {
 
 		// Adjust Lighting
-		renderer_->sunlight_.ambient = glm::vec3(0.05,0.05,0.05);
-		renderer_->lighting_.use_ssr = false;
-        renderer_->lighting_.exposure = 1.5f;
-        renderer_->lighting_.indirect_strength = 0.35f;
+		renderer_->sunlight_.ambient = glm::vec3(0.08,0.08,0.08);
+		renderer_->lighting_.use_ssr = true;
+        renderer_->lighting_.exposure = 2.0f;
+        renderer_->lighting_.indirect_strength = 0.3f;
 
         // Reset
         iterations_ = 0;
@@ -133,14 +133,14 @@ namespace xrobot
         	glm::vec3 aabb_min = temp[i].aabb_min - glm::vec3(1);
         	glm::vec3 aabb_max = temp[i].aabb_max + glm::vec3(1);
 
-        	if(aabb_min.x < main_camera_->Position.x &&
-        	   aabb_max.x > main_camera_->Position.x && 
-        	   aabb_min.z < main_camera_->Position.z &&
-        	   aabb_max.z > main_camera_->Position.z) 
+        	if(aabb_min.x < main_camera_->position_.x &&
+        	   aabb_max.x > main_camera_->position_.x && 
+        	   aabb_min.z < main_camera_->position_.z &&
+        	   aabb_max.z > main_camera_->position_.z) 
         	{
         		// Check Aim
-        		glm::vec3 fromPosition = main_camera_->Position;
-        		glm::vec3 toPosition = main_camera_->Front * 3.0f + fromPosition;
+        		glm::vec3 fromPosition = main_camera_->position_;
+        		glm::vec3 toPosition = main_camera_->front_ * 3.0f + fromPosition;
         		int res = scene_->world_->RayTest(fromPosition, toPosition);
 
         		if(res == temp[i].bullet_id)
@@ -149,7 +149,7 @@ namespace xrobot
         }
 
         // Find Front Direction in World Coordinate
-        glm::vec3 front_vector = main_camera_->Front;
+        glm::vec3 front_vector = main_camera_->front_;
         front_vector.y = 0;
         front_vector = glm::normalize(front_vector);
 
@@ -157,7 +157,7 @@ namespace xrobot
         std::vector<RayTestInfo> batch_raycast_result;
         lidar_->Update(front_vector,
                       glm::vec3(0,1,0),
-                      main_camera_->Position - glm::vec3(0.0f,0.8f,0));
+                      main_camera_->position_ - glm::vec3(0.0f,0.8f,0));
         batch_raycast_result = lidar_->GetResult();
 
         // Update Results in Renderer
@@ -168,7 +168,7 @@ namespace xrobot
                 renderer_->UpdateRay(i, glm::vec3(0), glm::vec3(0));
             } else {
                 renderer_->UpdateRay(i, 
-                		main_camera_->Position - glm::vec3(0.0f,0.8f,0),
+                		main_camera_->position_ - glm::vec3(0.0f,0.8f,0),
                         batch_raycast_result[i].pos);
             }
         }

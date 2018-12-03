@@ -126,16 +126,16 @@ namespace xrobot
 
 	        // Pick
 		    if(ctx_->GetKeyPressKP1()) {
-		    	glm::vec3 fromPosition = main_camera_->Position;
-		    	glm::vec3 toPosition = main_camera_->Front * 3.0f + fromPosition;
+		    	glm::vec3 fromPosition = main_camera_->position_;
+		    	glm::vec3 toPosition = main_camera_->front_ * 3.0f + fromPosition;
 		    	agent_sptr->PickUp(inventory_, fromPosition, toPosition);
 		    	renderer_->BakeScene(scene_->world_.get());
 		    }
 
 		    // Put
 		    if(ctx_->GetKeyPressKP2()) {
-		    	glm::vec3 fromPosition = main_camera_->Position;
-		    	glm::vec3 toPosition = main_camera_->Front * 3.0f + fromPosition;
+		    	glm::vec3 fromPosition = main_camera_->position_;
+		    	glm::vec3 toPosition = main_camera_->front_ * 3.0f + fromPosition;
 		    	agent_sptr->PutDown(inventory_, fromPosition, toPosition);
 		    	renderer_->BakeScene(scene_->world_.get());
 		    }
@@ -236,22 +236,22 @@ namespace xrobot
         	glm::vec3 aabb_min = temp[i].aabb_min - glm::vec3(1);
         	glm::vec3 aabb_max = temp[i].aabb_max + glm::vec3(1);
 
-        	if(aabb_min.x < main_camera_->Position.x &&
-        	   aabb_max.x > main_camera_->Position.x && 
-        	   aabb_min.z < main_camera_->Position.z &&
-        	   aabb_max.z > main_camera_->Position.z) 
+        	if(aabb_min.x < main_camera_->position_.x &&
+        	   aabb_max.x > main_camera_->position_.x && 
+        	   aabb_min.z < main_camera_->position_.z &&
+        	   aabb_max.z > main_camera_->position_.z) 
         	{
         		// Check Object Center is Within 30 deg Viewing Angle
         		std::vector<ObjectDirections> temp_dir;
         		scene_->world_->QueryObjectDirectionByLabel("fruit_bowl", 
-        				main_camera_->Front, main_camera_->Position, temp_dir);
+        				main_camera_->front_, main_camera_->position_, temp_dir);
         		if(temp_dir[i].dirs[0] < 0.52f)
         			return "idle";
         	}
         }
 
         // Find Front Direction in World Coordinate
-        glm::vec3 front_vector = main_camera_->Front;
+        glm::vec3 front_vector = main_camera_->front_;
         front_vector.y = 0;
         front_vector = glm::normalize(front_vector);
 
@@ -259,7 +259,7 @@ namespace xrobot
         std::vector<RayTestInfo> batch_raycast_result;
         lidar_->Update(front_vector,
                       glm::vec3(0,1,0),
-                      main_camera_->Position - glm::vec3(0.0f,0.8f,0));
+                      main_camera_->position_ - glm::vec3(0.0f,0.8f,0));
         batch_raycast_result = lidar_->GetResult();
 
         // Update Results in Renderer
@@ -270,7 +270,7 @@ namespace xrobot
                 renderer_->UpdateRay(i, glm::vec3(0), glm::vec3(0));
             } else {
                 renderer_->UpdateRay(i, 
-                		main_camera_->Position - glm::vec3(0.0f,0.8f,0),
+                		main_camera_->position_ - glm::vec3(0.0f,0.8f,0),
                         batch_raycast_result[i].pos);
             }
         }

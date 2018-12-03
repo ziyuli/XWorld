@@ -476,7 +476,7 @@ float CaculateDirectionalShadow(vec3 normal, vec3 position, float depth)
 
     if(shadowMode == 0)
     {
-        visibility = 1.04 - shadow_occlussion(depth, normal, direction.xyz, position);
+        visibility = 1.1 - shadow_occlussion(depth, normal, direction.xyz, position);
 
     }
     else if(shadowMode == 1 && numDirectionalLight > 0)

@@ -32,6 +32,8 @@ namespace xrobot {
 
 class Inventory;
 
+constexpr float kAngleThreshold = 0.1f;
+constexpr float kDistanceThreshold = 3.0f;
 constexpr int kCacheSize = 32;
 const glm::vec3 kVec3Zero = glm::vec3(0); 
 const glm::vec3 kVec3Up = glm::vec3(0,1,0);
@@ -79,7 +81,9 @@ enum LoadingFlags
     kOBJConcave = FORCE_CONCAVE,
     kURDFSelfCollision = URDF_USE_SELF_COLLISION,
     kURDFSelfCollisionExParents = URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS,
-    kURDFEnableSleeping = URDF_ENABLE_SLEEPING
+    kURDFEnableSleeping = URDF_ENABLE_SLEEPING,
+    kURDFUseInertiaFromFile = URDF_USE_INERTIA_FROM_FILE,
+    kURDFColorsFromFile = MJCF_COLORS_FROM_FILE
 };
 
 inline glm::mat4 TransformToMat4(const btTransform& transform) 
@@ -286,6 +290,7 @@ public:
 
     // Attach
     btTransform attach_transform_;
+    btTransform attach_object_orn_;
     std::weak_ptr<RobotBase> attach_object_;
 
 // xrobot::render_engine::RenderPart
@@ -401,6 +406,8 @@ public:
     void LoadRobotShape(const float scale);
     void LoadRobotJoint(const std::string &filename);
 
+    void EnableSleeping();
+
     void DisableSleeping();
 
     void Wake();
@@ -490,16 +497,20 @@ public:
         const bool concave = false
     );
 
+    bool InteractWith(const std::string& tag);
     bool TakeAction(const int act_id);
     bool GetCycle() const { return cycle_; }
     void SetCycle(const bool cycle) { cycle_ = cycle; }
     void SetStatus(const int status) { status_ = status; }
+    void SetLock(const bool lock) { lock_ = lock; }
+    bool GetLock() const { return lock_; }
     void RemoveRobotTemp();
 
     std::vector<std::string> GetActions() const { return object_name_list_; }
 
     float scale_;
     std::string label_;
+    std::string unlock_tag_;
     std::string path_;
     std::vector<std::string> object_path_list_;
     std::vector<std::string> object_name_list_;
@@ -508,6 +519,7 @@ private:
     void Remove();
 
     int status_;
+    bool lock_;
     bool cycle_;
 };
 
@@ -563,6 +575,57 @@ struct Ray {
     glm::vec3 to;
 };
 
+// ray-box-intersection (with direction)
+// https://www.scratchapixel.com/lessons/3d-basic-rendering/
+inline bool RayAABBIntersect(const Ray& r, 
+                             const glm::vec3 aabb_min,
+                             const glm::vec3 aabb_max)
+{
+    glm::vec3 ray_orig = r.from;
+    glm::vec3 ray_dir = glm::normalize(r.to - r.from);
+    glm::vec3 ray_invdir = 1.0f / ray_dir;
+
+    glm::vec3 aabb_cen = (aabb_max - aabb_min) * 0.5f + aabb_min;
+    glm::vec3 aabb_dir = glm::normalize(aabb_cen - r.from);
+
+    if (glm::dot(aabb_dir, ray_dir) < kAngleThreshold)
+        return false;
+
+    int ray_sign[3];
+    ray_sign[0] = (ray_invdir.x < 0);
+    ray_sign[1] = (ray_invdir.y < 0);
+    ray_sign[2] = (ray_invdir.z < 0);
+    
+    glm::vec3 bounds[2];
+    bounds[0] = aabb_min;
+    bounds[1] = aabb_max;
+
+    float tmin, tmax, tymin, tymax, tzmin, tzmax;
+    tmin = (bounds[ray_sign[0]].x - ray_orig.x) * ray_invdir.x;
+    tmax = (bounds[1-ray_sign[0]].x - ray_orig.x) * ray_invdir.x;
+    tymin = (bounds[ray_sign[1]].y - ray_orig.y) * ray_invdir.y;
+    tymax = (bounds[1-ray_sign[1]].y - ray_orig.y) * ray_invdir.y;
+
+    if ((tmin > tymax) || (tymin > tmax))
+        return false;
+    if (tymin > tmin)
+        tmin = tymin;
+    if (tymax < tmax)
+        tmax = tymax;
+
+    tzmin = (bounds[ray_sign[2]].z - ray_orig.z) * ray_invdir.z;
+    tzmax = (bounds[1-ray_sign[2]].z - ray_orig.z) * ray_invdir.z;
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+        return false;
+    if (tzmin > tmin)
+        tmin = tzmin;
+    if (tzmax < tmax)
+        tmax = tzmax;
+
+    return true;
+}
+
 struct RayTestInfo
 {
     int bullet_id;
@@ -607,6 +670,8 @@ public:
     double bullet_ts_;
     int reset_count_;
 
+    bool highlight_center_;
+
     void LoadMetadata(const char * filename);
     void AssignTag(const std::string& path, const std::string& tag);
     void UpdatePickableList(const std::string& tag, const bool pick);
@@ -635,6 +700,8 @@ public:
     void PrintCacheInfo();
     void BulletInit(const float gravity = 9.81f, const float timestep = 1.0/100.0);
     void BulletStep(const int skip_frames = 1);
+    void QueryInteractable(std::shared_ptr<RobotBase> robot);
+    void QueryMovable();
     void QueryPositions();
     void QueryPosition(std::shared_ptr<RobotBase> robot);
     void RemoveRobot(std::weak_ptr<RobotBase> rm_robot);
@@ -651,6 +718,23 @@ public:
         std::vector<ContactPoint>& contact_points);
     void GetRootContactPoints(std::weak_ptr<RobotBase> robot_in, std::weak_ptr<Object> part_in,
         std::vector<ContactPoint>& contact_points);
+
+
+    int CreateFixedConstraint(
+        std::weak_ptr<RobotBase> parent_robot,
+        std::weak_ptr<RobotBase> child_robot,
+        const int parent_link_id,
+        const int child_link_id,
+        const btVector3& parent_relative_position,
+        const btVector3& child_relative_position,
+        const btQuaternion& parent_relative_orientation = btQuaternion(),
+        const btQuaternion& child_relative_orientation = btQuaternion(),
+        const btVector3& joint_axis = btVector3()
+    );
+
+    void ChangeFixedConstraint() =delete;
+    void RemoveConstraint(const int constraint_id);
+
 
     int CreateFixedRootToTargetConstraint(std::weak_ptr<RobotBase> parent_robot,
         const btVector3& parent_relative_position,

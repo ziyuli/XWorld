@@ -62,6 +62,7 @@ Playground::Playground(const int w, const int h,
 	camera_pitch_ = 0.0f;
     w_ = w;
     h_ = h;
+    highlight_objects_ = false;
     inventory_opened_ = false;
     interact_ = false;
     gameover_ = false;
@@ -115,6 +116,11 @@ boost::python::dict Playground::GetStatus() const
     dictionary["cachesize"] = model_cache_size;
 
     return dictionary;
+}
+
+void Playground::HighlightCenter(const bool highlight)
+{
+    scene_->world_->highlight_center_ = highlight;
 }
 
 void Playground::SetLighting(const boost::python::dict lighting)
@@ -377,9 +383,9 @@ void Playground::CreateArena(const int width, const int length)
     scene_grid->CreateAndLoadTileURDF(test_floor);
 	scene_grid->GenerateArena(width, length);
 
-	if(inventory_) {
+	// if(inventory_) {
 	    
-	}
+	// }
 
     renderer_->sunlight_.ambient = glm::vec3(0.02,0.02,0.02);
     renderer_->lighting_.exposure = 0.3f;
@@ -747,7 +753,7 @@ Thing Playground::SpawnAnObject(const std::string& file,
         btQuaternion(btVector3(orentation.x,orentation.y,orentation.z),orentation.w),
         btVector3(scale, scale, scale),
         label,
-        fixed
+        fixed // fixed ? 0 : 100
     );
 
 	if(auto obj_sptr = obj_wptr.lock()) {
@@ -811,9 +817,9 @@ void Playground::FreeCamera(const boost::python::list position,
     main_camera_ = scene_->world_->add_camera(pos,
         vec3(0, 0, 0), camera_aspect_);
 
-    main_camera_->Yaw = yaw;
-    main_camera_->Pitch = pitch;
-    main_camera_->updateCameraVectors();
+    main_camera_->yaw_ = yaw;
+    main_camera_->pitch_ = pitch;
+    main_camera_->Update();
 }
 
 void Playground::UpdateFreeCamera(const boost::python::list position, 
@@ -821,10 +827,10 @@ void Playground::UpdateFreeCamera(const boost::python::list position,
 {
     glm::vec3 pos = list2vec3(position);
 
-    main_camera_->Position = pos;
-    main_camera_->Yaw = yaw;
-    main_camera_->Pitch = pitch;
-    main_camera_->updateCameraVectors();
+    main_camera_->position_ = pos;
+    main_camera_->yaw_ = yaw;
+    main_camera_->pitch_ = pitch;
+    main_camera_->Update();
 }
 
 void Playground::Initialize()
@@ -865,25 +871,25 @@ boost::python::dict Playground::GetObservationSpace()
 
 boost::python::tuple Playground::GetCameraPosition() const
 {
-    glm::vec3 position = main_camera_->Position;
+    glm::vec3 position = main_camera_->position_;
     return boost::python::make_tuple(position.x, position.y, position.z);
 }
 
 boost::python::tuple Playground::GetCameraRight() const
 {
-    glm::vec3 right = main_camera_->Right;
+    glm::vec3 right = main_camera_->right_;
     return boost::python::make_tuple(right.x, right.y, right.z);
 }
 
 boost::python::tuple Playground::GetCameraFront() const
 {
-    glm::vec3 front = main_camera_->Front;
+    glm::vec3 front = main_camera_->front_;
     return boost::python::make_tuple(front.x, front.y, front.z);
 }
 
 boost::python::tuple Playground::GetCameraUp() const
 {
-    glm::vec3 up = main_camera_->Up;
+    glm::vec3 up = main_camera_->up_;
     return boost::python::make_tuple(up.x, up.y, up.z);
 }
 
@@ -891,7 +897,7 @@ float Playground::GetCameraYaw() const
 {
     glm::vec3 world_front(1,0,0);
     glm::vec3 world_up(0,1,0);
-    glm::vec3 front_norm = glm::normalize(main_camera_->Front);
+    glm::vec3 front_norm = glm::normalize(main_camera_->front_);
     float yaw = glm::orientedAngle(front_norm, world_front, world_up);
     return yaw;
 }
@@ -1100,12 +1106,12 @@ void Playground::Update()
 
 float Playground::GetNearClippingDistance()
 {
-    return main_camera_->Near;
+    return main_camera_->GetNear();
 }
 
 float Playground::GetFarClippingDistance()
 {
-    return main_camera_->Far;
+    return main_camera_->GetFar();
 }
 
 boost::python::object Playground::GetCameraRGBDRaw()
@@ -1200,10 +1206,8 @@ boost::python::list Playground::EnableInteraction()
 
     int bullet_id = -1;
 
-    glm::vec3 from = main_camera_->Position;
-    glm::vec3 frnt = main_camera_->Front;
-    glm::vec2 from_2d(from.x, from.z);
-    glm::vec2 frnt_2d(frnt.x, frnt.z);
+    glm::vec3 from = main_camera_->position_;
+    glm::vec3 frnt = main_camera_->front_;
 
     auto bullet_world = scene_->world_;
 
@@ -1216,25 +1220,24 @@ boost::python::list Playground::EnableInteraction()
             if(std::dynamic_pointer_cast<RobotWithAnimation>(body) || 
                std::dynamic_pointer_cast<RobotWithConvertion>(body)) {
 
-                printf("body: %s\n", body->robot_data_.label_.c_str());
+                glm::vec3 aabb_min, aabb_max;
+                body->robot_data_.root_part_->GetAABB(aabb_min, aabb_max);
 
-                btTransform object_tr_bt = body->robot_data_.root_part_->object_position_;
-                btVector3 object_pos_bt = object_tr_bt.getOrigin();
-                glm::vec2 object_pos(object_pos_bt[0], object_pos_bt[2]);
+                bool intersect = RayAABBIntersect({from, from + frnt},
+                                                  aabb_min,
+                                                  aabb_max);
 
-                float dist_tmp = glm::distance(object_pos, from_2d);
-                float dir_tmp  = glm::dot(glm::normalize(object_pos - from_2d), frnt_2d);
+                glm::vec3 object_pos = (aabb_max - aabb_min) * 0.5f + aabb_min;
+                float dist = glm::distance(object_pos, from);
 
-                printf("dir: %f, dist: %f\n", dir_tmp, dist_tmp);
-
-                if(dist_tmp < 2.0f && dir_tmp > 0.5f) {
+                if(intersect && dist < kDistanceThreshold) {
                     bullet_id = body->robot_data_.bullet_handle_;
                 }
             }
         }
     }
 
-    printf("bullet_id: %d\n", bullet_id);
+    // printf("bullet_id: %d\n", bullet_id);
 
     boost::python::list ret;
 
@@ -1247,7 +1250,7 @@ boost::python::list Playground::EnableInteraction()
         std::vector<std::string> actions = object->GetActions();
 
         for (int i = 0; i < actions.size(); ++i) {
-            printf("action: %s\n", actions[i].c_str());
+            // printf("action: %s\n", actions[i].c_str());
             ret.append(actions[i]);
         }
 
@@ -1264,8 +1267,8 @@ void Playground::DisableInteraction()
 
 void Playground::Attach()
 {
-    glm::vec3 from = main_camera_->Position;
-    glm::vec3 to = main_camera_->Front * 3.0f + from;
+    glm::vec3 from = main_camera_->position_;
+    glm::vec3 to = main_camera_->front_ * 3.0f + from;
     
     auto bullet_world = scene_->world_;
     std::vector<RayTestInfo> temp_res;
@@ -1296,8 +1299,8 @@ std::string Playground::Grasp()
 	if(!inventory_)
 		return "Nothing";
 
-	glm::vec3 from = main_camera_->Position;
-	glm::vec3 to = main_camera_->Front * 3.0f + from;
+	glm::vec3 from = main_camera_->position_;
+	glm::vec3 to = main_camera_->front_ * 3.0f + from;
 
     if(auto agent_sptr = agent_.GetPtr().lock())
     {
@@ -1312,8 +1315,8 @@ std::string Playground::PutDown()
 	if(!inventory_)
 		return "Nothing";
 
-	glm::vec3 from = main_camera_->Position;
-	glm::vec3 to = main_camera_->Front * 3.0f + from;
+	glm::vec3 from = main_camera_->position_;
+	glm::vec3 to = main_camera_->front_ * 3.0f + from;
 
     if(auto agent_sptr = agent_.GetPtr().lock())
     {
@@ -1330,8 +1333,8 @@ std::string Playground::Rotate(const boost::python::list angle_py)
 
 	glm::vec3 angle = list2vec3(angle_py);
 
-	glm::vec3 from = main_camera_->Position;
-	glm::vec3 to = main_camera_->Front * 3.0f + from;
+	glm::vec3 from = main_camera_->position_;
+	glm::vec3 to = main_camera_->front_ * 3.0f + from;
 	
 	if(auto agent_sptr = agent_.GetPtr().lock())
     {
@@ -1355,10 +1358,8 @@ void Playground::TakeAction(const int action_id)
 
     int bullet_id = -1;
 
-    glm::vec3 from = main_camera_->Position;
-    glm::vec3 frnt = main_camera_->Front;
-    glm::vec2 from_2d(from.x, from.z);
-    glm::vec2 frnt_2d(frnt.x, frnt.z);
+    glm::vec3 from = main_camera_->position_;
+    glm::vec3 frnt = main_camera_->front_;
 
     auto bullet_world = scene_->world_;
 
@@ -1370,14 +1371,17 @@ void Playground::TakeAction(const int action_id)
             if(std::dynamic_pointer_cast<RobotWithAnimation>(body) || 
                std::dynamic_pointer_cast<RobotWithConvertion>(body)) {
 
-                btTransform object_tr_bt = body->robot_data_.root_part_->object_position_;
-                btVector3 object_pos_bt = object_tr_bt.getOrigin();
-                glm::vec2 object_pos(object_pos_bt[0], object_pos_bt[2]);
+                glm::vec3 aabb_min, aabb_max;
+                body->robot_data_.root_part_->GetAABB(aabb_min, aabb_max);
 
-                float dist_tmp = glm::distance(object_pos, from_2d);
-                float dir_tmp  = glm::dot(glm::normalize(object_pos - from_2d), frnt_2d);
+                bool intersect = RayAABBIntersect({from, from + frnt},
+                                                  aabb_min,
+                                                  aabb_max);
 
-                if(dist_tmp < 2.0f && dir_tmp > 0.5f) {
+                glm::vec3 object_pos = (aabb_max - aabb_min) * 0.5f + aabb_min;
+                float dist = glm::distance(object_pos, from);
+
+                if(intersect && dist < kDistanceThreshold) {
                     bullet_id = body->robot_data_.bullet_handle_;
                 }
             }
@@ -1407,10 +1411,8 @@ void Playground::Use(const int object_id)
 
     int bullet_id = -1;
 
-    glm::vec3 from = main_camera_->Position;
-    glm::vec3 frnt = main_camera_->Front;
-    glm::vec2 from_2d(from.x, from.z);
-    glm::vec2 frnt_2d(frnt.x, frnt.z);
+    glm::vec3 from = main_camera_->position_;
+    glm::vec3 frnt = main_camera_->front_;
 
     auto bullet_world = scene_->world_;
 
@@ -1423,14 +1425,17 @@ void Playground::Use(const int object_id)
             if(std::dynamic_pointer_cast<RobotWithAnimation>(body) || 
                std::dynamic_pointer_cast<RobotWithConvertion>(body)) {
 
-                btTransform object_tr_bt = body->robot_data_.root_part_->object_position_;
-                btVector3 object_pos_bt = object_tr_bt.getOrigin();
-                glm::vec2 object_pos(object_pos_bt[0], object_pos_bt[2]);
+                glm::vec3 aabb_min, aabb_max;
+                body->robot_data_.root_part_->GetAABB(aabb_min, aabb_max);
 
-                float dist_tmp = glm::distance(object_pos, from_2d);
-                float dir_tmp  = glm::dot(glm::normalize(object_pos - from_2d), frnt_2d);
+                bool intersect = RayAABBIntersect({from, from + frnt},
+                                                  aabb_min,
+                                                  aabb_max);
 
-                if(dist_tmp < 2.0f && dir_tmp > 0.5f) {
+                glm::vec3 object_pos = (aabb_max - aabb_min) * 0.5f + aabb_min;
+                float dist = glm::distance(object_pos, from);
+
+                if(intersect && dist < kDistanceThreshold) {
                     bullet_id = body->robot_data_.bullet_handle_;
                 }
             }
@@ -1519,14 +1524,14 @@ bool Playground::QueryObjectWithLabelAtCameraCenter(const std::string& label)
     	glm::vec3 aabb_min = temp[i].aabb_min - glm::vec3(1);
     	glm::vec3 aabb_max = temp[i].aabb_max + glm::vec3(1);
 
-    	if(aabb_min.x < main_camera_->Position.x &&
-    	   aabb_max.x > main_camera_->Position.x && 
-    	   aabb_min.z < main_camera_->Position.z &&
-    	   aabb_max.z > main_camera_->Position.z) 
+    	if(aabb_min.x < main_camera_->position_.x &&
+    	   aabb_max.x > main_camera_->position_.x && 
+    	   aabb_min.z < main_camera_->position_.z &&
+    	   aabb_max.z > main_camera_->position_.z) 
     	{
     		// Check Aim
-    		glm::vec3 fromPosition = main_camera_->Position;
-    		glm::vec3 toPosition = main_camera_->Front * 2.0f + fromPosition;
+    		glm::vec3 fromPosition = main_camera_->position_;
+    		glm::vec3 toPosition = main_camera_->front_ * 2.0f + fromPosition;
     		int res = scene_->world_->RayTest(fromPosition, toPosition);
 
     		if(res == temp[i].bullet_id) {
@@ -1612,8 +1617,8 @@ boost::python::list Playground::QueryObjectByLabel(const std::string& label)
 
 Thing Playground::QueryObjectAtCameraCenter()
 {
-	glm::vec3 from = main_camera_->Position;
-	glm::vec3 to = main_camera_->Front * 3.0f + from;
+	glm::vec3 from = main_camera_->position_;
+	glm::vec3 to = main_camera_->front_ * kDistanceThreshold + from;
 	
 	auto bullet_world = scene_->world_;
     std::vector<RayTestInfo> temp_res;
@@ -1661,8 +1666,8 @@ bool Playground::QueryObjectWithLabelAtForward(const std::string& label)
     	glm::vec3 aabb_min = temp[i].aabb_min;
     	glm::vec3 aabb_max = temp[i].aabb_max;
     	glm::vec3 aabb_center = (aabb_min + aabb_max) * 0.5f;
-    	glm::vec3 camera_center = main_camera_->Position;
-    	glm::vec3 camera_front  = main_camera_->Front;
+    	glm::vec3 camera_center = main_camera_->position_;
+    	glm::vec3 camera_front  = main_camera_->front_;
 
     	if(glm::distance(camera_center, aabb_center) < 3.0f) 
     	{
@@ -1685,8 +1690,8 @@ bool Playground::QueryObjectWithLabelNearMe(const std::string& label)
     	glm::vec3 aabb_min = temp[i].aabb_min;
     	glm::vec3 aabb_max = temp[i].aabb_max;
     	glm::vec3 aabb_center = (aabb_min + aabb_max) * 0.5f;
-    	glm::vec3 camera_center = main_camera_->Position;
-    	glm::vec3 camera_front  = main_camera_->Front;
+    	glm::vec3 camera_center = main_camera_->position_;
+    	glm::vec3 camera_front  = main_camera_->front_;
 
     	if(glm::distance(camera_center, aabb_center) < 3.0f) 
     		return true;

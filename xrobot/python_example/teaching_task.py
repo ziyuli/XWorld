@@ -191,9 +191,9 @@ class XWorld3DTask(object):
 
 	# Debug
 
-	def display_rgb(self, sentence):
+	def display_rgb(self, sentence, w = 640, h = 360):
 		image_str = self.env.GetCameraRGBDRaw()
-		image_rgbd = np.fromstring(image_str, np.uint8).reshape( 360, 640, 4 )
+		image_rgbd = np.fromstring(image_str, np.uint8).reshape( h, w, 4 )
 		image_rgbd = cv2.cvtColor(image_rgbd, cv2.COLOR_BGRA2RGBA)
 		image_rgbd = cv2.flip(image_rgbd, 0)
 
@@ -201,7 +201,7 @@ class XWorld3DTask(object):
 		image_rgb = np.array(image_rgbd_resize[:,:,:3])
 
 		cv2.putText(image_rgb, sentence, (30,30), \
-			cv2.FONT_HERSHEY_PLAIN, 0.9, (15,15,15), 1, cv2.LINE_AA);
+			cv2.FONT_HERSHEY_PLAIN, 1.0, (255,15,15), 1, cv2.LINE_AA);
 
 		cv2.imshow("RGB", image_rgb)
 
@@ -216,8 +216,6 @@ class Task(object):
 	def run_stage(self):
 		
 		self.current_stage = self.stages[self.current_stage]()[0]
-
-	# def obtain_performance(self):
 
 	def register_stage(self, stage_name, func):
 		self.stages[stage_name] = func

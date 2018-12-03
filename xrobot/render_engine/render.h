@@ -45,9 +45,7 @@ struct RenderSettings {
                                                                shadow_split(quality + 3),
                                                                shadow_lamda(0.7f),
                                                                shadow_near_offset(50.0f),
-                                                               shadow_resolution(2048),
-                                                               use_basic_frustrum_culling(true),
-                                                               use_free_camera(true) {}
+                                                               shadow_resolution(2048){}
 
     // Deferred Shading                                                           
     bool use_deferred;
@@ -57,22 +55,12 @@ struct RenderSettings {
     bool  use_vct;
     bool  vct_bake_before_simulate; // Only for fully static scene
     int   vct_resolution; // Recommend 128 or 256
-
-    // Physically Based Rendering
-    bool  use_pbr;
-
     // Shadow
     bool  use_shadow;
     int   shadow_split;
     float shadow_lamda;
     float shadow_near_offset;
     int   shadow_resolution;
-
-    // Culling
-    bool  use_basic_frustrum_culling;
-
-    // Others
-    bool use_free_camera;
 };
 
 struct Lighting {
@@ -88,8 +76,8 @@ struct Lighting {
     // shadow_bias: increase to reduce the shadow arc effect however 
     //              this could also detach the shadow
     // force_disable_shadow: disable directional shadow during rendering
-    float shadow_bias_clamp = 0.0005f;
-    float shadow_bias_scale = 0.0002f;
+    float shadow_bias_clamp = 0.0005f; //0.0005f;
+    float shadow_bias_scale = 0.0002f; //0.0002f;
     bool force_disable_shadow = false;
 
     // VXGI
@@ -105,8 +93,8 @@ struct Lighting {
     float propagation_distance = 0.5f;
     float conetracing_distance = 1.0f;
     float traceshadow_distance = 0.3f;
-    float boost_ambient = 0.02f;
-    float sample_factor = 0.4f;
+    float boost_ambient = 0.03f;
+    float sample_factor = 0.5f;
     float ao_falloff = 1000.0f;
     float ibl_factor = 0.0f;
     bool force_disable_propagation = false;
@@ -212,11 +200,11 @@ public:
     bool need_voxelize_;
 
     // Cone Tracing Textures
-    Texture3D * voxel_albedo_;
-    Texture3D * voxel_normal_;
-    Texture3D * voxel_emissive_;
-    Texture3D * voxel_radiance_;
-    Texture3D * voxel_mipmaps_[6];
+    std::shared_ptr<Texture3D> voxel_albedo_;
+    std::shared_ptr<Texture3D> voxel_normal_;
+    std::shared_ptr<Texture3D> voxel_emissive_;
+    std::shared_ptr<Texture3D> voxel_radiance_;
+    std::shared_ptr<Texture3D> voxel_mipmaps_[6];
 
     // PSSM
     CSMUniforms csm_uniforms_;
@@ -235,9 +223,9 @@ public:
     RenderSettings settings_;
 
     // Frame Buffers
-    FBO * free_camera_framebuffer_;
-    std::vector<FBO*> camera_framebuffer_list_;
-    std::vector<FBO*> multiplied_framebuffer_list_;
+    std::shared_ptr<FBO> free_camera_framebuffer_;
+    std::vector<std::shared_ptr<FBO>> camera_framebuffer_list_;
+    std::vector<std::shared_ptr<FBO>> multiplied_framebuffer_list_;
 
     // Cube Map
     GLuint reflection_map_;
@@ -319,7 +307,6 @@ public:
 
     void DrawBatchRay();
 
-    //
     //void DrawEmptyAABB(Map* map, const Shader& shader);
     
     //void DrawRoomAABB(Map* map, const Shader& shader); 
@@ -332,7 +319,7 @@ public:
     void StepRenderAllCamerasDeferred(
             RenderWorld* world, std::vector<int>& picks, const bool color_pick);
 
-    void StepRenderGetDepthAllCameras();
+    void StepRenderGetDepthAllCameras(RenderWorld* world);
 
     void StepRenderShadowMaps(RenderWorld * world, Camera * camera);
 
@@ -342,11 +329,9 @@ public:
 
     int StepRender(RenderWorld* map, int pick_camera_id = -1);
 
-    int StepRender2(RenderWorld* map, int pick_camera_id = -1);
+    int StepRender2(RenderWorld* map, int pick_camera_id = -1) =delete;
     
-    std::vector<Image> GetRenderedImages() {
-        return img_buffers_;
-    }
+    std::vector<Image> GetRenderedImages() const { return img_buffers_; }
 
     void InitSSR();
 

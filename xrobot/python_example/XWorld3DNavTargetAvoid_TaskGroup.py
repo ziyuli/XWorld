@@ -9,7 +9,7 @@ class XRobotEnv(object):
     def __init__(self):
         self.env = Playground(640, \
                               360, \
-		                      DEBUG_VISUALIZATION, \
+		                      HEADLESS, \
                               RENDER_QUALITY_NORMAL, \
                               1)
 

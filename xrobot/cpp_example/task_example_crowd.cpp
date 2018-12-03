@@ -96,7 +96,8 @@ namespace xrobot
 	std::string Task_Crowd::NavTarget() {
 
 		CarveShape cs;
-		cs.position = glm::vec2(main_camera_->Position.x, main_camera_->Position.z);
+		cs.position = glm::vec2(main_camera_->position_.x, 
+								main_camera_->position_.z);
 		cs.radius = 1.3f;
 		cs.moving = false;
 

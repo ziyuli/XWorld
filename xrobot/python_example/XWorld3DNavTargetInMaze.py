@@ -51,11 +51,11 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 
 		self.env.MakeObjectPickable("small crate")
 		self.env.LoadBasicObjects(doors, keys, d_tags, door1, wall_test, [floor_test])
-		start = self.env.LoadSceneConfigure(5, 5, 3, 2)
+		start = self.env.LoadSceneConfigure(6, 6, 4, 3)
 		lastgroup = self.env.GetRoomGroups()[-1]
 
-		conf   = {"single" : [cat1, lastgroup, 3], \
-         		  "stack"  : [crate03, crate1, 1, 1, 1]}
+		conf   = {"single" : [cat1, lastgroup, 3, crate1, -1, 5], \
+         		  "stack"  : [crate03, crate1, 1, 1, 5]}
 
 		self.env.LoadModels(models, m_tags)
 		self.env.SpawnModelsConf(conf)
@@ -77,7 +77,7 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 		reward, time_out = self._time_reward()
 		next_stage = "navigation"
 
-		super(XWorld3DNavTargetInMaze, self).display_rgb(self.sentence)
+		super(XWorld3DNavTargetInMaze, self).display_rgb(self.sentence,480,480)
 
 		if not time_out:
 			if self.env.QueryObjectWithLabelAtCameraCenter("cat"):
