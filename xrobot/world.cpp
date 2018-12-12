@@ -554,7 +554,7 @@ bool RobotWithConvertion::TakeAction(const int act_id) {
         LoadURDFFile(
             object_path_list_[act_id],
             current_position, current_orentation, scale_,
-            label_ + "_" + object_name_list_[act_id], true);
+            label_, true);
 
         bullet_world->robot_list_.pop_back();
 
@@ -637,7 +637,7 @@ void RobotWithConvertion::LoadConvertedObject(
 
     SetCycle(cycle);
     SetStatus(0);
-    label_ = action_label;
+    label_ = label;
     scale_ = scale;
     path_ = filename;
 
@@ -1548,14 +1548,14 @@ void RobotBase::Move(const float move, const float rotate, const bool remit)
         btVector3 robot_position = robot_transform.getOrigin();
         btQuaternion robot_rotation = robot_transform.getRotation(); 
 
-        orentation = orentation * btQuaternion(btVector3(0, 1, 0), rotate);
-        angle += rotate;
+        btQuaternion orentation_new = orentation * btQuaternion(btVector3(0, 1, 0), rotate);
+        float angle_new = angle + rotate;
 
         btQuaternion robot_rotation_new = 
-            btQuaternion(btVector3(0, 1, 0), angle) * robot_orentation;
+            btQuaternion(btVector3(0, 1, 0), angle_new) * robot_orentation;
 
         btVector3 robot_position_new = 
-            robot_position + btTransform(orentation) * btVector3(move,0,0);
+            robot_position + btTransform(orentation_new) * btVector3(move,0,0);
 
         btTransform robot_transform_new = robot_transform;
         robot_transform_new.setOrigin(robot_position_new);
@@ -1571,15 +1571,6 @@ void RobotBase::Move(const float move, const float rotate, const bool remit)
 
         for (int i = 0; i < contact_points.size(); ++i)
         {
-
-            // if(rotate > 0.0f) {
-            //     robot_transform.setOrigin(robot_position);
-            //     robot_transform.setRotation(robot_rotation);
-            //     bullet_world->SetTransformation(shared_from_this(), robot_transform);
-            //     bullet_world->BulletStep();
-            //     return;
-            // }
-
             glm::vec3 current_position_vec3(robot_position_new[0],0,robot_position_new[2]);
 
             ContactPoint cp = contact_points[i];
@@ -1596,6 +1587,13 @@ void RobotBase::Move(const float move, const float rotate, const bool remit)
 
             if(cp.contact_distance < -0.01 && dir < 0.2f){
 
+                if(fabs(rotate) > 0.0f) {
+                    robot_transform.setOrigin(robot_position);
+                    robot_transform.setRotation(robot_rotation);
+                    bullet_world->SetTransformation(shared_from_this(), robot_transform);
+                    bullet_world->BulletStep();
+                    return;
+                }
 
                 float sign = 1;
                 float dist = glm::clamp(cp.contact_distance, -0.05f, 0.0f);
@@ -1635,6 +1633,9 @@ void RobotBase::Move(const float move, const float rotate, const bool remit)
                 return;
             }
         }
+
+        angle = angle_new;
+        orentation = orentation_new;
     }
 }
 
@@ -1784,7 +1785,8 @@ std::string RobotBase::PickUp(std::shared_ptr<Inventory> inventory,
 
                 // printf("pick\n");
 
-                inventory->PutObject(object);
+                if(inventory->PutObject(object))
+                    bullet_world->icon_inventory_.push_back(object->robot_data_.path_);
 
                 return object->robot_data_.label_;
 
@@ -1851,7 +1853,7 @@ std::string RobotBase::PutDown(std::shared_ptr<Inventory> inventory,
 
                         volatile bool intersect = false;
 
-                        //printf("position: %f %f %f\n", position.x, position.y, position.z);
+                        // printf("position: %f %f %f\n", position.x, position.y, position.z);
 
                         // In Range
                         std::vector<RayTestInfo> temp1_res;
@@ -1885,7 +1887,7 @@ std::string RobotBase::PutDown(std::shared_ptr<Inventory> inventory,
                         
                         if(!intersect) {
                             // TODO
-                            // Add a List for Special Objs
+                            // Not very stable...
 
                             for (size_t i = 0; i < bullet_world->size(); i++) {
                                 auto body = bullet_world->robot_list_[i];
@@ -1900,7 +1902,7 @@ std::string RobotBase::PutDown(std::shared_ptr<Inventory> inventory,
                                     glm::vec3 aabb_min1, aabb_max1;
                                     part->GetAABB(aabb_min1, aabb_max1);
 
-                                    if(aabb_min1.y >= (aabb_max0.y - aabb_min0.y))
+                                    if(position.y >= aabb_max1.y)
                                         continue;
 
                                     if(aabb_min1.x < aabb_max0.x &&
@@ -1923,6 +1925,8 @@ std::string RobotBase::PutDown(std::shared_ptr<Inventory> inventory,
 
                                 bullet_world->SetTransformation(temp_obj, tr);
                                 bullet_world->BulletStep();
+
+                                bullet_world->icon_inventory_.pop_back();
 
                                 return temp_obj->robot_data_.label_;
                             }
@@ -2508,6 +2512,9 @@ std::weak_ptr<RobotBase> World::LoadRobot(
        // printf("[Load Robot] Find Pickable Object: %s\n", tag.c_str());
     }
 
+    // Load Icon????
+    load_icon(filename);
+
     int find = (int) filename.find(".obj");
     if(find > -1) {
         // Load OBJ
@@ -2771,6 +2778,7 @@ void World::CleanEverything2()
 
     tag_list_.clear();
     pickable_list_.clear();
+    icon_inventory_.clear();
 }
 
 void World::PrintCacheInfo()
@@ -2800,6 +2808,7 @@ void World::CleanEverything()
 
     tag_list_.clear();
     pickable_list_.clear();
+    icon_inventory_.clear();
 
     recycle_robot_map_.clear();
     robot_list_.clear();
@@ -2883,6 +2892,8 @@ void World::BulletStep(const int skip_frames)
     if(highlight_center_ && get_highlight_center() < 1) 
         QueryMovable();
 
+    if(cameras_size() < 1 || !camera(0)) return;
+
     for (auto robot : robot_list_)
     {
         if (!robot) continue;
@@ -2893,6 +2904,7 @@ void World::BulletStep(const int skip_frames)
 
         // TODO
         // Find Camera
+
         float pitch = glm::radians(camera(0)->pre_pitch_);
         glm::vec3 offset = camera(0)->offset_;
 

@@ -3,6 +3,8 @@ Examples
 
 # Task Examples
 
+- `StackBoxes.sh`: Stack all three boxes in the scene
+- `CutCake.sh`: Find cake knife abd cut the cake
 - `NavTarget.sh`: Navigate to the goal
 - `NavTargetAvoid.sh`: Avoid the goal
 - `NavTargetBetween.sh`: Navigate between two goals
@@ -13,7 +15,8 @@ Examples
 
 # Demo
 
-- `InteractionDemo.sh`: Examples for several interactable objects
+- `InteractionDemo.sh`: Examples of several interactable objects
+- `LoadXWorldSceneDemo.sh`: Examples of loading \*.xworld scene
 
 # Benchmark 
 

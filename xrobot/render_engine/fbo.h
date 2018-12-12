@@ -26,7 +26,7 @@ public:
         bool color1Buffer = false,
 		GLenum magFilter = GL_NEAREST,
         GLenum minFilter = GL_NEAREST,
-		GLint internalFormat = GL_RGBA,
+		GLint internalFormat = GL_RGBA8,
         GLint format = GL_UNSIGNED_BYTE,
 		GLint wrap = GL_CLAMP_TO_BORDER);
 

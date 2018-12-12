@@ -1,4 +1,4 @@
-// #define DEBUG
+//#define DEBUG
 //#define DYN_VOXEL
 
 #include <unistd.h>
@@ -21,6 +21,7 @@ Render::Render(const int width,
 									  avg_framerate_(0.0),
 									  all_rendered_frames_(0.0),
 									  free_camera_(),
+									  batch_ray_vao_(0),
 									  last_x_(0.0f),
 									  last_y_(0.0f),
 									  delta_time_(0.0f),
@@ -71,8 +72,6 @@ Render::Render(const int width,
 									  camera_framebuffer_list_(num_cameras),
 									  multiplied_framebuffer_list_(num_cameras),
 									  reflection_map_(0),
-									  pixel_buffer_index_(0),
-									  pixel_buffer_next_index_(1),
 									  pixel_buffers_{0, 0},
 									  num_frames_(0),
 									  img_buffers_(0),
@@ -454,7 +453,7 @@ void Render::VoxelConeTracing(RenderWorld* world, Camera * camera)
 	glColorMask(true, true, true, true);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glViewport(0, 0, width_, height_);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -725,7 +724,7 @@ void Render::ClearTextures()
 void Render::BakeScene(RenderWorld* world)
 {
 	assert(world);
-	if(settings_.use_vct)
+	if(settings_.use_vct && settings_.vct_bake_before_simulate)
 		VoxelizeScene(world);
 }
 
@@ -868,8 +867,8 @@ void Render::InitGBuffer()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width_, height_, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_position_, 0);
 
 	glGenTextures(1, &g_normal_);
@@ -877,8 +876,8 @@ void Render::InitGBuffer()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width_, height_, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, g_normal_, 0);
 
 	glGenTextures(1, &g_albedospec_);
@@ -886,8 +885,8 @@ void Render::InitGBuffer()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, g_albedospec_, 0);
 
 	glGenTextures(1, &g_pbr_);
@@ -895,8 +894,8 @@ void Render::InitGBuffer()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, g_pbr_, 0);
 
 	unsigned int attachments[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
@@ -915,14 +914,22 @@ void Render::InitGBuffer()
 
 void Render::InitPBO()
 {
-	glGenBuffers(2, pixel_buffers_);
+	glGenBuffers(4, pixel_buffers_);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[0]);
 	glBufferData(GL_PIXEL_PACK_BUFFER,
-				 width_ * height_ * 4 * sizeof(unsigned char),
+				 width_ * height_ * sizeof(unsigned char),
 				 nullptr, GL_STREAM_READ);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[1]);
 	glBufferData(GL_PIXEL_PACK_BUFFER,
-				 width_ * height_ * 4 * sizeof(unsigned char),
+				 width_ * height_ * sizeof(unsigned char),
+				 nullptr, GL_STREAM_READ);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[2]);
+	glBufferData(GL_PIXEL_PACK_BUFFER,
+				 width_ * height_ * sizeof(unsigned char),
+				 nullptr, GL_STREAM_READ);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[3]);
+	glBufferData(GL_PIXEL_PACK_BUFFER,
+				 width_ * height_ * sizeof(unsigned char),
 				 nullptr, GL_STREAM_READ);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
@@ -971,7 +978,7 @@ Render::~Render() {
 	glDeleteVertexArrays(1, &quad_vao_);
 	glDeleteBuffers(1, &cube_vbo_);
 	glDeleteBuffers(1, &quad_vbo_);
-	glDeleteBuffers(2, pixel_buffers_);
+	glDeleteBuffers(4, pixel_buffers_);
 	
 	img_buffers_.clear();
 
@@ -1178,6 +1185,7 @@ void Render::InitDrawBatchRay(const int rays) {
 	num_rays = rays;
 
 	if(batch_ray_vao_ == 0) {
+
 		glGenVertexArrays(1, &batch_ray_vao_);
 		glBindVertexArray(batch_ray_vao_);
 
@@ -1441,18 +1449,15 @@ void Render::StepRenderFreeCamera(RenderWorld *world) {
 
 	Draw(world, lambert_shader, minAABB - glm::vec3(1), maxAABB + glm::vec3(1));
 
-	line_shader.use();
-	line_shader.setMat4("projection", projection);
-	line_shader.setMat4("view", view);
-	line_shader.setVec3("color", glm::vec3(1,0,0));
-	DrawRootAABB(world, line_shader);
-	DrawSubTiles(world, line_shader);
-	DrawWorldAABB(world, line_shader);
+	// line_shader.use();
+	// line_shader.setMat4("projection", projection);
+	// line_shader.setMat4("view", view);
+	// line_shader.setVec3("color", glm::vec3(1,0,0));
+	// DrawRootAABB(world, line_shader);
+	// DrawSubTiles(world, line_shader);
+	// DrawWorldAABB(world, line_shader);
+	// glEnable(GL_PROGRAM_POINT_SIZE);
 
-	// line_shader.setVec3("color", glm::vec3(0,1,0));
-	// DrawEmptyAABB(map, line_shader);
-
-	glEnable(GL_PROGRAM_POINT_SIZE);
 	DrawBatchRay();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1712,7 +1717,21 @@ void Render::StepRenderGetDepthAllCameras(RenderWorld* world) {
 
 		Shader multiply_shader = shaders_[kMultiply];
 
+		float scl = (float) (world->inventory_size_ - 1.0f) / world->inventory_size_;
+		float icon_size = (float)width_ * 0.1f * scl;
+		float inv_aspect = (float)height_ / width_;
+		float start_u = 0.5f - (world->inventory_size_ * 0.05f * inv_aspect);
+		float end_u = 0.5f + (world->inventory_size_ * 0.05f * inv_aspect);
+		float draw_inventory = world->inventory_size_ < 0 ? 0 : 1;
+
+		Camera* camera = world->camera(0);
+
 		multiply_shader.use();
+		multiply_shader.setFloat("start_u", start_u * draw_inventory);
+		multiply_shader.setFloat("end_u", end_u * draw_inventory);
+		multiply_shader.setFloat("zNear", camera->GetNear());
+		multiply_shader.setFloat("zFar", camera->GetFar());
+
 		multiply_shader.setFloat("aspect_ratio", (float)width_ / height_);
 
 		int highlight = world->get_highlight_center();
@@ -1751,10 +1770,6 @@ void Render::StepRenderGetDepthAllCameras(RenderWorld* world) {
 		} else {
 			multiply_shader.setFloat("deferred", 1);
 
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_2D, g_normal_);
-			glUniform1i(glGetUniformLocation(shaders_[kMultiply].id(), "mask"), 2);
-
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, g_position_);
 			glUniform1i(glGetUniformLocation(shaders_[kMultiply].id(), "dep"), 1);
@@ -1762,47 +1777,83 @@ void Render::StepRenderGetDepthAllCameras(RenderWorld* world) {
 
 		RenderQuad();
 
-		pixel_buffer_index_ = (pixel_buffer_index_ + 1) % 2;
-		pixel_buffer_next_index_ = (pixel_buffer_index_ + 1) % 2;
+		if(world->inventory_size_) {
+			Shader color_shader = shaders_[kColor];
+			color_shader.use();
 
+			for (int n = 0; n < world->icon_inventory_.size(); ++n)
+			{
+				std::string filename = world->icon_inventory_[n];
 
-		glReadBuffer(GL_COLOR_ATTACHMENT0);           
-		if(num_frames_ * (int)multiplied_framebuffer_list_.size() < 2) {
-			glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB,
-							pixel_buffers_[pixel_buffer_index_]);
-			glReadPixels(0, 0, width_, height_, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-			
-			GLubyte* ptr = (GLubyte*)glMapBufferARB(
-					GL_PIXEL_PACK_BUFFER_ARB,GL_READ_ONLY_ARB);
-			if (ptr) {
-				Image image_temp;
-				std::vector<unsigned char> temp(
-						ptr, ptr + (int)(width_*height_*4));
-				image_temp.data = temp;
-				image_temp.camera_id = i;
-				img_buffers_.push_back(image_temp);
-				
-				glUnmapBufferARB(GL_PIXEL_PACK_BUFFER_ARB);
+				int icon_texture_id = -1;
+				auto has_find = world->icon_cache_.find(filename);
+				if(has_find != world->icon_cache_.end()) {
+					int id = world->icon_cache_[filename];
+
+					if(id < 0) {
+						std::size_t ext = filename.find_last_of(".");
+						std::string icon_path = filename.substr(0, ext) + ".png";
+
+						icon_texture_id = TextureFromFile(icon_path);
+						world->icon_cache_[filename] = icon_texture_id;
+					} else {
+						icon_texture_id = id;
+					}
+
+					glActiveTexture(GL_TEXTURE0);
+					glBindTexture(GL_TEXTURE_2D, icon_texture_id);
+					glUniform1i(glGetUniformLocation(color_shader.id(), "tex"), 0);
+					glViewport((start_u + 0.1f * scl * n) * (float)width_, 0, icon_size, icon_size);
+					RenderQuad();
+				}
 			}
-			
-		} else {
-			glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB,
-							pixel_buffers_[pixel_buffer_next_index_]);
-			GLubyte* ptr = (GLubyte*)glMapBufferARB(
-					GL_PIXEL_PACK_BUFFER_ARB,GL_READ_ONLY_ARB);
-			if (ptr) {
-				Image image_temp;
-				std::vector<unsigned char> temp(
-						ptr, ptr + (int)(width_*height_*4));
-				image_temp.data = temp;
-				image_temp.camera_id = i;
-				img_buffers_.push_back(image_temp);
-				
-				glUnmapBufferARB(GL_PIXEL_PACK_BUFFER_ARB);
-			}
-			glReadPixels(0, 0, width_, height_, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 		}
-		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
+
+		glPixelStorei(GL_PACK_ALIGNMENT, 4);
+		glReadBuffer(GL_COLOR_ATTACHMENT0);           
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[0]);
+		glReadPixels(0, 0, width_, height_ / 4, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[1]);
+		glReadPixels(0, height_ / 4, width_, height_ / 4, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[2]);
+		glReadPixels(0, height_ / 2, width_, height_ / 4, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[3]);
+		glReadPixels(0, 3 * height_ / 4, width_, height_ / 4, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+
+		Image image_temp;
+		image_temp.camera_id = i;
+
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[0]);
+		GLubyte* pbo_ptr= (GLubyte*)glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+		std::vector<unsigned char> temp0(pbo_ptr, pbo_ptr + (int)(width_*height_));
+		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[1]);
+		pbo_ptr= (GLubyte*)glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+		std::vector<unsigned char> temp1(pbo_ptr, pbo_ptr + (int)(width_*height_));
+		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+
+		temp0.reserve(width_*height_*4 + 16);
+		temp0.insert(temp0.end(), temp1.begin(), temp1.end());
+
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[2]);
+		pbo_ptr= (GLubyte*)glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+		std::vector<unsigned char> temp2(pbo_ptr, pbo_ptr + (int)(width_*height_));
+		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffers_[3]);
+		pbo_ptr= (GLubyte*)glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+		std::vector<unsigned char> temp3(pbo_ptr, pbo_ptr + (int)(width_*height_));
+		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+
+		temp2.reserve(width_*height_*2 + 8);
+		temp2.insert(temp2.end(), temp3.begin(), temp3.end());
+		temp0.insert(temp0.end(), temp2.begin(), temp2.end());
+
+		image_temp.data = temp0;
+		img_buffers_.push_back(image_temp);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
@@ -1847,9 +1898,9 @@ void Render::Visualization() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);   
 
 	#ifdef DEBUG
-		shaders_[kCrossHair].use();
-		glViewport(0, 0, width_, height_);
-		RenderMarker();
+		// shaders_[kCrossHair].use();
+		// glViewport(0, 0, width_, height_);
+		// RenderMarker();
 
 		glViewport(width_, 0, width_, height_);
 		shaders_[kColor].use();
@@ -1866,11 +1917,11 @@ void Render::Visualization() {
 		// multiplied_framebuffer_list_[0]->ActivateAsTexture(shaders_[kDepth].id(), "tex", 0);
 		// RenderQuad();
 
-	// glViewport(0, 0, 256, 64);
+	// glViewport(0, 0, width_, height_);
 	// shaders_[kColor].use();
 	// shaders_[kColor].setInt("tex", 0);
 	// glActiveTexture(GL_TEXTURE0);
-	// glBindTexture(GL_TEXTURE_2D, ssr_tex_);
+	// glBindTexture(GL_TEXTURE_2D, ssao_tex_blur_);
 	// RenderQuad();
 
   #endif
@@ -1904,11 +1955,13 @@ int Render::StepRender(RenderWorld* world, int pick_camera_id) {
 	#ifdef DEBUG
 		glEnable(GL_LINE_SMOOTH);
 		StepRenderFreeCamera(world);
+		glDisable(GL_LINE_SMOOTH);
 	#endif
 
 	if(!settings_.use_deferred) {
 		StepRenderAllCameras(world, picks, pick_camera_id >= 0);
 	} else {
+		glDisable(GL_BLEND);
 		StepRenderAllCamerasDeferred(world, picks, pick_camera_id >= 0);
 		SSAO(world);
 		if(lighting_.use_ssr)
@@ -1933,11 +1986,11 @@ void Render::InitSSR() {
 	glBindFramebuffer(GL_FRAMEBUFFER, ssr_fbo_);
 	glGenTextures(1, &ssr_tex_);
 	glBindTexture(GL_TEXTURE_2D, ssr_tex_);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width_, height_, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssr_tex_, 0);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "SSR Framebuffer not complete!" << std::endl;
@@ -1986,11 +2039,11 @@ void Render::InitSSAO() {
 	glBindFramebuffer(GL_FRAMEBUFFER, ssao_composite_fbo_);
 	glGenTextures(1, &ssao_composite_tex_);
 	glBindTexture(GL_TEXTURE_2D, ssao_composite_tex_);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width_, height_, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssao_composite_tex_, 0);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "SSAO Framebuffer not complete!" << std::endl;
@@ -2006,8 +2059,8 @@ void Render::InitSSAO() {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width_, height_, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssao_tex_, 0);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "SSAO Framebuffer not complete!" << std::endl;
@@ -2020,8 +2073,8 @@ void Render::InitSSAO() {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width_, height_, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssao_tex_blur_, 0);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "SSAO Blur Framebuffer not complete!" << std::endl;
@@ -2032,7 +2085,9 @@ void Render::InitSSAO() {
 	std::default_random_engine generator;
 	for (unsigned int i = 0; i < 64; ++i)
 	{
-		glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
+		glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0,
+						 randomFloats(generator) * 2.0 - 1.0,
+						 randomFloats(generator));
 		sample = glm::normalize(sample);
 		sample *= randomFloats(generator);
 		float scale = float(i) / 64.0;
@@ -2046,7 +2101,9 @@ void Render::InitSSAO() {
 	std::vector<glm::vec3> ssaoNoise;
 	for (unsigned int i = 0; i < 16; i++)
 	{
-		glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
+		glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0,
+						randomFloats(generator) * 2.0 - 1.0,
+						0.0f);
 		ssaoNoise.push_back(noise);
 	}
 
@@ -2108,8 +2165,11 @@ void Render::SSAO(RenderWorld* world) {
 			glClear(GL_COLOR_BUFFER_BIT);
 			shaderSSAOBlur.use();
 			shaderSSAOBlur.setInt("ssaoInput", 0);
+			shaderSSAOBlur.setInt("gPosition", 1);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, ssao_tex_);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, g_position_);
 			RenderQuad();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}

@@ -117,4 +117,5 @@ void main() {
     vec2 se = m + vec2( 1.0 / res.x,-1.0f / res.y);
 
     FragColor = fxaa(tex, TexCoords.xy * res, res, nw, ne, sw, se, m);
+    // FragColor = texture(tex, TexCoords);
 }

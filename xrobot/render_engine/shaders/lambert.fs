@@ -63,7 +63,7 @@ void main()
     // }
     // else
     // {
-    //     diffuse = kD;// * urdf_color;
+    //     diffuse = kD * urdf_color;
     // }
 
     vec3 diffuse = urdf_color;

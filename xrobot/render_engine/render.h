@@ -40,11 +40,11 @@ struct RenderSettings {
     RenderSettings(const unsigned int quality = kLowQuality) : use_deferred(quality < 1 ? 0 : 1),
                                                                use_vct(quality < 2 ? 0 : 1),
                                                                vct_bake_before_simulate(quality < 3 ? false : true),
-                                                               vct_resolution(quality < 3 ? 256 : 256),
+                                                               vct_resolution(quality < 3 ? 256 : 512),
                                                                use_shadow(quality < 1 ? 0 : 1),
                                                                shadow_split(quality + 3),
                                                                shadow_lamda(0.7f),
-                                                               shadow_near_offset(50.0f),
+                                                               shadow_near_offset(70.0f),
                                                                shadow_resolution(2048){}
 
     // Deferred Shading                                                           
@@ -65,7 +65,7 @@ struct RenderSettings {
 
 struct Lighting {
     Lighting() : exposure(1.3f),
-                 indirect_strength(0.4f) {}
+                 indirect_strength(0.1f) {}
     // Lighting
     // exposure: change the brightness of the scene
     // indirect_strength: change the contribution of the indirect lighting
@@ -93,12 +93,12 @@ struct Lighting {
     float propagation_distance = 0.5f;
     float conetracing_distance = 1.0f;
     float traceshadow_distance = 0.3f;
-    float boost_ambient = 0.03f;
+    float boost_ambient = 0.01f;
     float sample_factor = 0.5f;
     float ao_falloff = 1000.0f;
     float ibl_factor = 0.0f;
     bool force_disable_propagation = false;
-    bool linear_voxelize = false;
+    bool linear_voxelize = true;
     bool use_ssr = false;
 };
 
@@ -231,9 +231,7 @@ public:
     GLuint reflection_map_;
 
     // I/O
-    int pixel_buffer_index_;
-    int pixel_buffer_next_index_;
-    GLuint pixel_buffers_[2];
+    GLuint pixel_buffers_[4];
     int num_frames_;
     std::vector<Image> img_buffers_;
 
@@ -254,7 +252,6 @@ public:
     GLuint cubemap_capture_fbo_;
     GLuint cubemap_capture_rbo_;
     GLuint cubemap_texture_;
-
     GLuint combine_capture_fbo_;
     GLuint combine_texture_;
 

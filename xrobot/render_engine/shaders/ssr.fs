@@ -57,8 +57,7 @@ void main()
         
     // TODO
     // mix between blur tex, error area use vxgi
-    FragColor = texture(renderedTexture, TexCoords.xy) * 0.9
-        + vec4(mix(ssr, vec3(0), max(1.0 - error, 0.0)), 1) * 0.5 * (1 - rough);
+    FragColor = texture(renderedTexture, TexCoords.xy) + vec4(0.5 * (1 - rough) * mix(ssr, vec3(0), max(1.0 - error, 0.0)), 0);
 }
  
 vec3 binarySearch(inout vec3 dir, inout vec3 hitCoord, inout float dDepth)

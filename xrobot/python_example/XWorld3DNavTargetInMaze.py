@@ -1,3 +1,4 @@
+from libxrobot import *
 from teaching_task import *
 import cv2
 import numpy as np
@@ -22,13 +23,12 @@ floor_2    = "../data/floor2/floor.urdf";
 crate1     = "../data/crate_1/crate.urdf";
 crate03    = "../data/crate_0.3/crate.urdf";
 cat1       = "../data/cat_1/cat.urdf";
+gift       = "../data/gift/gift.json";
+piano      = "../data/piano/piano.json";
+box_cardboard = "../data/cardboard_box/box.urdf";
 
 floor_test  = "../data/floor/floor.urdf";
 wall_test   = "../data/wall/floor.urdf";
-
-models     = [crate1]
-m_tags     = ["crate1"]
-conf       = {"single" : [crate1, -1, 20]}
 
 class XWorld3DNavTargetInMaze(XWorld3DTask):
 	def __init__(self, env):
@@ -46,16 +46,16 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 		doors  = [door2, door3, door4, door5]
 		keys   = [key2, key3, key4, key5]
 		d_tags = ["red", "yellow", "blue", "purple"]
-		models = [crate1, crate03, cat1]
-		m_tags = ["large crate", "small crate", "cat"]
+		models = [box_cardboard, piano, gift, cat1]
+		m_tags = ["box", "piano", "gift", "cat"]
 
-		self.env.MakeObjectPickable("small crate")
+		self.env.MakeObjectPickable("box")
 		self.env.LoadBasicObjects(doors, keys, d_tags, door1, wall_test, [floor_test])
 		start = self.env.LoadSceneConfigure(6, 6, 4, 3)
 		lastgroup = self.env.GetRoomGroups()[-1]
 
-		conf   = {"single" : [cat1, lastgroup, 3, crate1, -1, 5], \
-         		  "stack"  : [crate03, crate1, 1, 1, 5]}
+		conf   = {"single" : [cat1, lastgroup, 3, box_cardboard, -1, 3,  gift, -1, 5], \
+				  "stack"  : [box_cardboard, box_cardboard, -1, 1, 3]}
 
 		self.env.LoadModels(models, m_tags)
 		self.env.SpawnModelsConf(conf)
@@ -65,6 +65,7 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 			start, [-1,0,0,1.57], 0.6, "Agent", True)
 		self.env.AttachCameraTo(self.agent, [0.3,1.3,0.0])
 		self.env.Initialize()
+		self.env.HighlightCenter(True)
 
 		self._bind("S -> start")
 		self._bind("G -> '" + "cat" + "'")
@@ -76,8 +77,6 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 		
 		reward, time_out = self._time_reward()
 		next_stage = "navigation"
-
-		super(XWorld3DNavTargetInMaze, self).display_rgb(self.sentence,480,480)
 
 		if not time_out:
 			if self.env.QueryObjectWithLabelAtCameraCenter("cat"):
@@ -116,3 +115,88 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 		G --> %s
 		""" % all_goal_names
 		return grammar_str, "S"
+
+class XWorld3DEnv(object):
+	def __init__(self):
+		self.env = Playground(640, \
+							  480, \
+							  HEADLESS, \
+							  RENDER_QUALITY_NORMAL, \
+							  1)
+
+		self.task_group = TaskGroup("TaskGroup")
+		self.task_group.add_task("NavTargetMaze", XWorld3DNavTargetInMaze(self.env))
+		self.first = True
+
+	def reset(self):
+		self.env.Clear()
+
+	def step(self, action):
+
+		if self.first != True:
+			self.env.UpdateSimulationWithAction(action)
+
+		self.first = False
+		self.task_group.run_stage()
+		sentence = self.task_group.get_sentence()
+
+		self.env.UpdateRenderer()
+		image_str = self.env.GetCameraRGBDRaw()
+		image_rgbd = np.fromstring(image_str, np.uint8).reshape( 480, 640, 4 )
+		image_rgbd = cv2.flip(image_rgbd, 0)
+		image_rgbd_resize = cv2.resize(image_rgbd, None, fx=0.8, fy=0.8)
+		image_rgb = np.array(image_rgbd_resize[:,:,:3])
+		image_d   = np.array(image_rgbd_resize[:,:,3:4])
+
+		cv2.putText(image_rgb, sentence, (30,30), \
+			cv2.FONT_HERSHEY_PLAIN, 1.25, (15,255,15), 1, cv2.LINE_AA);
+		cv2.imshow("RGB", image_rgb)
+
+	def render(self):
+		self.env.UpdateRenderer()
+
+	def game_over(self):
+		return False
+
+def main():
+
+	env = XWorld3DEnv()
+	
+	while (not env.game_over()):
+
+		action = NO_ACTION
+
+		# action inputs from keyboard
+		key = cv2.waitKey(0)
+		if key == 119:   # W
+			action = 0
+		elif key == 97:  # A
+			action = 2
+		elif key == 115: # S
+			action = 1
+		elif key == 100: # D
+			action = 3
+		elif key == 49:  # kp1 Pick
+			action = 8
+		elif key == 50:  # kp2 Drop
+			action = 9
+		elif key == 48:  # kp9 Up
+			action = 4
+		elif key == 57:  # kp0 Down
+			action = 5
+		elif key == 54: # kp6 Open
+			action = 12
+		elif key == 51: # kp3 Close
+			action = 13
+		elif key == 55: # kp7 Enable Interact
+			action = 11
+		elif key == 56: # kp8 Disable Interact
+			action = 13
+		elif key == 27:  # ESC
+			break
+
+		# update
+		env.step(action)
+
+if __name__ == '__main__':
+	main()

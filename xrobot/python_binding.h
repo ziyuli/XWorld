@@ -230,6 +230,7 @@ public:
 
 	// Create a camera and attach it to a certain object in the scene
 	void AttachCameraTo(Thing object, const boost::python::list offset_py);
+	void UpdateAttachCamera(const float pitch);
 
 	// Create a free camera
 	void FreeCamera(const boost::python::list position, const float yaw, const float pitch);
@@ -251,6 +252,8 @@ public:
 	//
 	// This member function is nessecary for use "Pickup" and "Putdown" actions
 	void EnableInventory(const int max_capacity = 1);
+
+	void ClearInventory();
 
 	// Enable navigations to use path-finding for a object or robot
 	//
@@ -300,6 +303,8 @@ public:
 
 	// Clear everything in the scene, including the camera
 	void Clear();
+	void ClearSpawnObjectsExceptAgent();
+
 
 	// Generate a empty scene with checkerboard style floors and walls
 	//
@@ -315,6 +320,10 @@ public:
 
 	// Generate a random size room
 	void CreateRandomGenerateScene();
+
+
+	void LoadXWorldScene(const std::string& filename);
+	boost::python::dict GetXWorldScene() const { return json_scene_; }
 
 	// Load a profile to generate random size room
 	//
@@ -365,12 +374,17 @@ public:
 					    const boost::python::list orentation_py,
 					    const float scale,
 					    const std::string& label,
-					    const bool fixed = true);
+					    const bool fixed = true,
+					    const bool occupy = true);
+
+	void RemoveAnObject(Thing& object);
 
 	// Initialize camera
 	//
 	// Make sure call this member function before rendering loop
 	void Initialize();
+
+	void HoldActions(const bool hold);
 
 	// Update simulation and renderer
 	void Update();
@@ -433,6 +447,8 @@ public:
 	// 8-bit unsigned char RGBA raw 
 	boost::python::object GetCameraRGBDRaw();
 
+	Thing GetAgent() const { return agent_; }
+
 	// Move the object or robot 
 	//
 	// The actual distance offset per step is 0.005 * speed
@@ -467,7 +483,8 @@ public:
 	std::string Rotate(const boost::python::list angle_py);
 
 	// Teleport an object or robot to a certain position in scene
-	void Teleport(Thing object, const boost::python::list position_py);
+	void Teleport(Thing object, const boost::python::list position_py,
+							    const boost::python::list orientation_py);
 
 	// Move or rotate the joint in certain position with maximum forces	
 	//
@@ -490,7 +507,7 @@ public:
 	// Take an action to a object with action id
 	//
 	// action id are limited from 0 to 3
-	void TakeAction(const int action_id);
+	bool TakeAction(const int action_id);
 
 	// Open / Close Inventory
 	// TODO
@@ -535,7 +552,9 @@ public:
 	// Get the framerate, rendered frames count and cache information
 	boost::python::dict GetStatus() const;
 
-	void HighlightCenter(const bool mode);
+	void HighlightCenter(const bool highlight);
+
+	void DisplayInventory(const bool display);
 
 
 	// Debug and Unfinished Member Functions
@@ -560,6 +579,7 @@ private:
 	float camera_pitch_;
 	float camera_yaw_;
 	
+	bool hold_actions_;
 	bool highlight_objects_;
 	bool kill_after_arrived_;
 	bool gameover_;
@@ -567,10 +587,12 @@ private:
 	bool inventory_opened_;
 	Thing agent_;
 
+	boost::python::dict json_scene_;
 	boost::python::list current_actions_;
 	boost::python::list current_objects_;
 	boost::python::list current_event_;
 
+	std::vector<Thing> objects_;
 	std::shared_ptr<Map> scene_;
 	std::shared_ptr<Inventory> inventory_;
 	std::shared_ptr<Navigation> crowd_;
@@ -592,7 +614,7 @@ BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(LoadSUNCG_member_overloads,
 									   Playground::LoadSUNCG, 3, 4)
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(SpawnAnObject_member_overloads, 
-									   Playground::SpawnAnObject, 5, 6)
+									   Playground::SpawnAnObject, 5, 7)
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(MoveForward_member_overloads, 
 									   Playground::MoveForward, 0, 1)
@@ -666,7 +688,7 @@ BOOST_PYTHON_MODULE(libxrobot)
 	)
 	.def("SpawnAnObject", &Playground::SpawnAnObject,
 		SpawnAnObject_member_overloads(
-			args("file", "position_py", "orentation_py", "scale", "label", "fixed"),
+			args("file", "position_py", "orentation_py", "scale", "label", "fixed", "occupy"),
 			"spawn"
 		)
 	)
@@ -697,6 +719,15 @@ BOOST_PYTHON_MODULE(libxrobot)
 		)
 	)
 
+	.def("ClearSpawnObjectsExceptAgent", &Playground::ClearSpawnObjectsExceptAgent)
+	.def("HoldActions", &Playground::HoldActions)
+	.def("UpdateAttachCamera", &Playground::UpdateAttachCamera)
+	.def("ClearInventory", &Playground::ClearInventory)
+	.def("RemoveAnObject", &Playground::RemoveAnObject)
+	.def("GetAgent", &Playground::GetAgent)
+	.def("GetXWorldScene", &Playground::GetXWorldScene)
+	.def("DisplayInventory", &Playground::DisplayInventory)
+	.def("LoadXWorldScene", &Playground::LoadXWorldScene)
 	.def("HighlightCenter", &Playground::HighlightCenter)
 	.def("QueryLastEvent", &Playground::QueryLastEvent)
 	.def("GetCameraYaw", &Playground::GetCameraYaw)
@@ -782,6 +813,7 @@ BOOST_PYTHON_MODULE(libxrobot)
 	scope().attr("DISABLE_INTERACTION") = 12;
 	scope().attr("NO_ACTION")           = 14;
 	scope().attr("HEADLESS")            = 1;
+	scope().attr("VISUALIZATION")       = 0;
 	scope().attr("DEBUG_VISUALIZATION") = 0;
 	scope().attr("GRID")                = 0;
 	scope().attr("SUNCG")               = 1;

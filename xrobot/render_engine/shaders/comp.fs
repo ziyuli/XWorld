@@ -1,27 +1,5 @@
-// MIT License
-
-// Copyright (c) 2017 José Villegas
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 #version 330 core
-out vec3 FragColor;
+out vec4 FragColor;
 
 in vec2 TexCoords;
 
@@ -95,6 +73,7 @@ vec4 fxaa(sampler2D tex, vec2 fragCoord, vec2 resolution,
     vec4 texColor = texture(tex, v_rgbM);
     vec3 rgbM  = texColor.xyz;
     vec3 luma = vec3(0.299, 0.587, 0.114);
+    vec4 luma4 = vec4(luma, 0.0);
     float lumaNW = dot(rgbNW, luma);
     float lumaNE = dot(rgbNE, luma);
     float lumaSW = dot(rgbSW, luma);
@@ -115,18 +94,21 @@ vec4 fxaa(sampler2D tex, vec2 fragCoord, vec2 resolution,
               max(vec2(-FXAA_SPAN_MAX, -FXAA_SPAN_MAX),
               dir * rcpDirMin)) * inverseVP;
     
-    vec3 rgbA = 0.5 * (
-        texture(tex, fragCoord * inverseVP + dir * (1.0 / 3.0 - 0.5)).xyz +
-        texture(tex, fragCoord * inverseVP + dir * (2.0 / 3.0 - 0.5)).xyz);
-    vec3 rgbB = rgbA * 0.5 + 0.25 * (
-        texture(tex, fragCoord * inverseVP + dir * -0.5).xyz +
-        texture(tex, fragCoord * inverseVP + dir * 0.5).xyz);
+    vec4 a = texture(tex, fragCoord * inverseVP + dir * (1.0 / 3.0 - 0.5));
+    vec4 b = texture(tex, fragCoord * inverseVP + dir * (2.0 / 3.0 - 0.5));
+    vec4 c = texture(tex, fragCoord * inverseVP + dir * -0.5);
+    vec4 d = texture(tex, fragCoord * inverseVP + dir *  0.5);
 
-    float lumaB = dot(rgbB, luma);
+    vec4 rgbA = 0.5 * (a + b);
+    vec4 rgbB = rgbA * 0.5 + 0.25 * (c + d);
+
+    float lumaB = dot(rgbB, luma4);
     if ((lumaB < lumaMin) || (lumaB > lumaMax))
-        color = vec4(rgbA, texColor.a);
+        color = rgbA;
     else
-        color = vec4(rgbB, texColor.a);
+        color = rgbB;
+
+    color.a = texColor.a;
 
     return color;
 }
@@ -139,6 +121,6 @@ void main()
     vec2 sw = m + vec2(-1.0 / res.x,-1.0f / res.y);
     vec2 se = m + vec2( 1.0 / res.x,-1.0f / res.y);
 
-    FragColor = texture(ssao, TexCoords).r * vec3(fxaa(src, TexCoords.xy * res, res, nw, ne, sw, se, m));
-    // FragColor = texture(ssao, TexCoords).r * vec3(1) * texture(src, TexCoords).rgb;
+    vec4 ao = vec4(vec3(texture(ssao, TexCoords).r),1);
+    FragColor = ao * fxaa(src, TexCoords.xy * res, res, nw, ne, sw, se, m);
 }  

@@ -24,13 +24,13 @@ namespace xrobot
 	std::string Task_TestScene::Start() {
 
 		// Adjust Lighting
-		renderer_->sunlight_.direction = glm::vec3(-2.5,1.5,2.5);
-		renderer_->sunlight_.ambient = glm::vec3(0.2,0.2,0.2) * 2.0f;
-		renderer_->sunlight_.diffuse = glm::vec3(255.0,230.0,150.0) * (1.5f / 255.0f);
-		renderer_->lighting_.use_ssr = true;
-        renderer_->lighting_.exposure = 1.5f;
-        renderer_->lighting_.boost_ambient = 0.03f;
-        renderer_->lighting_.indirect_strength = 1.0f;
+		renderer_->sunlight_.direction = glm::vec3(1.0,2.5,0.5);
+		renderer_->sunlight_.ambient = glm::vec3(0.2,0.2,0.2) * 0.05f;
+		renderer_->sunlight_.diffuse = glm::vec3(255.0,255.0,255.0) * (0.8f / 256.0f);
+		renderer_->lighting_.use_ssr = false;
+        renderer_->lighting_.exposure = 0.8f;
+        renderer_->lighting_.boost_ambient = 0.01f;
+        renderer_->lighting_.indirect_strength = 0.8f;
 
         // Reset
         iterations_ = 0;
@@ -38,21 +38,22 @@ namespace xrobot
 
 		// Load Scene
 		auto obj = scene_->world_->LoadRobot(
-	        bistro_in,
+	        sponza,
 	        btVector3(0, 0, 0),
 	        btQuaternion(btVector3(1,0,0),0),
-	        btVector3(0.015f,0.015f,0.015f),
+	        btVector3(0.8, 0.8, 0.8),
 	        "scene",
 	        true,0,true,true
 	    );
-	    scene_->world_->set_world_size(-2,-20,18,7);
+	    scene_->world_->set_world_size(-14,-8,14,8);
+	    // scene_->world_->set_world_size(-2,-20,18,7);
 
 	    // Spawn Agent
 	    agent_ = scene_->world_->LoadRobot(
 	        husky,
-	        btVector3(0,0.55,0),
+	        btVector3(0,0.05,0),
 	        btQuaternion(btVector3(-1,0,0),1.57),
-	        btVector3(1,1,1),
+	        btVector3(1.0,1.0,1.0),
 	        "Husky",
 	        true
 	    );

@@ -62,6 +62,7 @@ Playground::Playground(const int w, const int h,
 	camera_pitch_ = 0.0f;
     w_ = w;
     h_ = h;
+    hold_actions_ = false;
     highlight_objects_ = false;
     inventory_opened_ = false;
     interact_ = false;
@@ -71,6 +72,7 @@ Playground::Playground(const int w, const int h,
     crowd_ = nullptr;
     inventory_ = nullptr;
     lidar_ = nullptr;
+    objects_ = std::vector<Thing>();
 }
 
 Playground::~Playground() {}
@@ -121,6 +123,18 @@ boost::python::dict Playground::GetStatus() const
 void Playground::HighlightCenter(const bool highlight)
 {
     scene_->world_->highlight_center_ = highlight;
+}
+
+void Playground::DisplayInventory(const bool display)
+{
+    if(!inventory_) return;
+
+    if(display) {
+        scene_->world_->inventory_size_ = 
+            inventory_->GetNumUsedSpace() + inventory_->GetNumFreeSpace();
+    } else {
+        scene_->world_->inventory_size_ = 0;
+    }
 }
 
 void Playground::SetLighting(const boost::python::dict lighting)
@@ -234,7 +248,7 @@ void Playground::EnableLidar(const int num_rays, const float max_distance)
 		lidar_ = std::make_shared<Lidar>(scene_->world_.get(), 
 										 num_rays,
 										 max_distance);
-		renderer_->InitDrawBatchRay(180);
+		renderer_->InitDrawBatchRay(num_rays);
 	}
 }
 
@@ -248,6 +262,9 @@ boost::python::list Playground::UpdateLidar(const boost::python::list front_py,
 	glm::vec3 front    = list2vec3(front_py);
 	glm::vec3 up       = list2vec3(up_py);
 	glm::vec3 position = list2vec3(position_py);
+
+    front = glm::normalize(front);
+    up = glm::normalize(up);
 
 	if(lidar_)
 	{
@@ -279,6 +296,12 @@ void Playground::EnableInventory(const int max_capacity)
 {
 	if(!inventory_)
 		inventory_ = std::make_shared<Inventory>(max_capacity);
+}
+
+void Playground::ClearInventory()
+{
+    if(inventory_)
+        inventory_->ClearInventory();
 }
 
 void Playground::EnableNavigation(const boost::python::list min_corner, 
@@ -351,6 +374,21 @@ void Playground::AssignNavigationAgentTarget(const NavAgent& agent,
     }
 }
 
+void Playground::ClearSpawnObjectsExceptAgent()
+{
+    for(auto& object : objects_) {
+        if(!object.__eq__(agent_)) {
+            RemoveAnObject(object);
+        }
+    }
+
+    if(crowd_)
+        crowd_->Reset();
+
+    if(inventory_)
+        inventory_->ClearInventory();
+}
+
 void Playground::Clear()
 {
     if(scene_)  
@@ -363,6 +401,7 @@ void Playground::Clear()
 		inventory_->ClearInventory();
         //inventory_->ResetPickableObjectTag();
 	
+    objects_.clear();
 	iterations_ = 0;
     camera_pitch_ = 0;
 }
@@ -375,6 +414,8 @@ void Playground::CreateArena(const int width, const int length)
 
     if(!scene_)
         scene_ = std::make_shared<MapGrid>();
+
+    scene_->world_->inventory_size_ = 0;
 
     std::shared_ptr<MapGrid> scene_grid 
         = std::dynamic_pointer_cast<MapGrid>(scene_);
@@ -403,6 +444,8 @@ void Playground::CreateRandomGenerateScene()
     if(!scene_)
         scene_ = std::make_shared<MapGrid>();
 
+    scene_->world_->inventory_size_ = 0;
+
     std::shared_ptr<MapGrid> scene_grid 
         = std::dynamic_pointer_cast<MapGrid>(scene_);
 
@@ -415,6 +458,165 @@ void Playground::CreateRandomGenerateScene()
     renderer_->lighting_.boost_ambient = 0.02f;
     renderer_->lighting_.shadow_bias_scale = 0.0003f;
     renderer_->lighting_.linear_voxelize = false;
+}
+
+void Playground::LoadXWorldScene(const std::string& filename)
+{
+    std::shared_ptr<MapGrid> scene_grid 
+        = std::dynamic_pointer_cast<MapGrid>(scene_);
+
+    scene_->world_->inventory_size_ = 0;
+
+    boost::python::dict scene_dict;
+
+    FILE* fp = fopen(filename.c_str(), "rb");
+    if (!fp) {
+        fprintf(stderr, "Unable to open xworld scene %s\n", filename.c_str());
+        return;
+    }
+
+    std::string text;
+    fseek(fp, 0, SEEK_END);
+    long const size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char* buffer = new char[size + 1];
+    unsigned long const usize = static_cast<unsigned long const>(size);
+    if (fread(buffer, 1, usize, fp) != usize) { 
+        fprintf(stderr, "Unable to read %s\n", filename.c_str()); 
+        return;
+    }
+    else { buffer[size] = 0; text = buffer; }
+    delete[] buffer;
+    fclose(fp);
+
+    // Digest file
+    Json::Value json_root;
+    Json::Reader json_reader;
+    Json::Value *json_items, *json_item, *json_value;
+    if (!json_reader.parse(text, json_root, false)) {
+        fprintf(stderr, "Unable to parse %s\n", filename.c_str());
+        return;
+    }
+
+    char version[1024];
+    strncpy(version, "NoVersion", 1024);
+    if (GetJsonObjectMember(json_value, &json_root, "Version", Json::stringValue)) {
+        strncpy(version, json_value->asString().c_str(), 1024);
+        if (strcmp(version, "xworld3d@2.0") != 0) {
+            fprintf(stderr, "Unable to parse this version %s\n", version);
+            return;
+        }
+    }
+
+    // Scene Size
+    Json::Value *json_size;
+    if (GetJsonObjectMember(json_size, &json_root, "Size", Json::objectValue)) {
+
+        float min_x = 0;
+        if (GetJsonObjectMember(json_value, json_size, "min_x"))
+            min_x = json_value->asFloat();
+
+        float min_z = 0;
+        if (GetJsonObjectMember(json_value, json_size, "min_z"))
+            min_z = json_value->asFloat();
+
+        float max_x = 0;
+        if (GetJsonObjectMember(json_value, json_size, "max_x"))
+            max_x = json_value->asFloat();
+
+        float max_z = 0;
+        if (GetJsonObjectMember(json_value, json_size, "max_z"))
+            max_z = json_value->asFloat();
+
+        scene_grid->world_->set_world_size(min_x, min_z, max_x, max_z);
+    }
+
+    // Parse levels
+    Json::Value *json_levels, *json_level;
+    if (!GetJsonObjectMember(json_levels, &json_root, "Scene", Json::arrayValue)) 
+        return;
+    for (Json::ArrayIndex index = 0; index < json_levels->size(); index++) {
+        if (!GetJsonArrayEntry(json_level, json_levels, index)) 
+            return;
+        if (json_level->type() != Json::objectValue) continue;
+
+        int obj_id = index;
+
+        std::string label = "";
+        if (GetJsonObjectMember(json_value, json_level, "Label"))
+            label = json_value->asString();
+
+        std::string path = "";
+        if (GetJsonObjectMember(json_value, json_level, "Path"))
+            path = json_value->asString();
+
+        int uid = 0;
+        if (GetJsonObjectMember(json_value, json_level, "UID"))
+            uid = json_value->asInt();
+
+        bool fixed = true;
+        if (GetJsonObjectMember(json_value, json_level, "Fixed"))
+            fixed = json_value->asBool();
+
+        Json::Value *json_positions;
+        Json::Value *json_position;
+        if (!GetJsonObjectMember(json_positions, json_level, "Position", Json::objectValue)) 
+            return;
+
+        boost::python::list position;
+        GetJsonObjectMember(json_position, json_positions, "x", Json::realValue);
+        position.append(json_position->asFloat());
+        GetJsonObjectMember(json_position, json_positions, "y", Json::realValue);
+        position.append(json_position->asFloat());
+        GetJsonObjectMember(json_position, json_positions, "z", Json::realValue);
+        position.append(json_position->asFloat());
+
+
+        Json::Value *json_scales;
+        Json::Value *json_scale;
+        if (!GetJsonObjectMember(json_scales, json_level, "Scale", Json::objectValue)) 
+            return;
+
+        // boost::python::list scale;
+        GetJsonObjectMember(json_scale, json_scales, "x", Json::realValue);
+        float uniform_scale = json_scale->asFloat();
+        // scale.append(json_scale->asFloat());
+        // GetJsonObjectMember(json_scale, json_scales, "y", Json::realValue);
+        // scale.append(json_scale->asFloat());
+        // GetJsonObjectMember(json_scale, json_scales, "z", Json::realValue);
+        // scale.append(json_scale->asFloat());
+
+
+        Json::Value *json_orientations;
+        Json::Value *json_orientation;
+        if (!GetJsonObjectMember(json_orientations, json_level, "Orientation", Json::objectValue)) 
+            return;
+
+        constexpr float ep = 0.0001f;
+
+        boost::python::list orientation;
+        float x, y, z, w;
+
+        GetJsonObjectMember(json_orientation, json_orientations, "x", Json::realValue);
+        x = json_orientation->asFloat();
+        GetJsonObjectMember(json_orientation, json_orientations, "y", Json::realValue);
+        y = json_orientation->asFloat();
+        GetJsonObjectMember(json_orientation, json_orientations, "z", Json::realValue);
+        z = json_orientation->asFloat();
+        GetJsonObjectMember(json_orientation, json_orientations, "w", Json::realValue);
+        w = json_orientation->asFloat();
+
+        orientation.append(x);
+        orientation.append(y);
+        orientation.append(z);
+        orientation.append(w);
+
+        Thing obj = SpawnAnObject(path, position, orientation, uniform_scale, label, fixed);
+        scene_dict[uid] = obj;
+        objects_.push_back(obj);
+    }
+
+    json_scene_ = scene_dict;
 }
 
 void Playground::LoadBasicObjects(const boost::python::list doors,
@@ -681,6 +883,8 @@ void Playground::CreateEmptyScene(const float min_x, const float max_x,
     std::shared_ptr<Map> scene_generic 
         = std::dynamic_pointer_cast<Map>(scene_);
 
+    scene_->world_->inventory_size_ = 0;
+
     scene_generic->GenerateGenetricMap();
 
     scene_generic->world_->set_world_size(min_x, min_z, max_x, max_z);
@@ -706,6 +910,8 @@ void Playground::LoadSUNCG(const std::string& house,
 
     std::shared_ptr<MapSuncg> scene_suncg 
         = std::dynamic_pointer_cast<MapSuncg>(scene_);
+
+    scene_->world_->inventory_size_ = 0;
 
     if(filter > -1)
         scene_suncg->SetRemoveAll(filter);
@@ -734,12 +940,26 @@ void Playground::ResolvePath()
     }
 }
 
+void Playground::RemoveAnObject(Thing& object)
+{
+    if(object.__eq__(agent_)) {
+        printf("Cannot remove agent!\n");
+        return;
+    }
+
+    if(auto obj_sptr = object.GetPtr().lock()) {
+        obj_sptr->RemoveRobotTemp();
+        scene_->world_->BulletStep();
+    }
+}
+
 Thing Playground::SpawnAnObject(const std::string& file, 
 							    const boost::python::list position_py,
 				    			const boost::python::list orentation_py,
 							    const float scale,
 							    const std::string& label,
-							    const bool fixed)
+							    const bool fixed,
+                                const bool occupy)
 {
 
 	std::weak_ptr<RobotBase> obj_wptr;
@@ -763,25 +983,28 @@ Thing Playground::SpawnAnObject(const std::string& file,
 		obj_sptr->DisableSleeping();
 	}
 
-    if(auto scene_grid = std::dynamic_pointer_cast<MapGrid>(scene_)) {
+    if(occupy) {
 
-        BBox box(
-            glm::vec2(position.x - 0.5f, position.z - 0.5f),
-            glm::vec2(position.x + 0.5f, position.z + 0.5f)
-        );
+        if(auto scene_grid = std::dynamic_pointer_cast<MapGrid>(scene_)) {
 
-        scene_grid->GenerateEmpty(box);
+            BBox box(
+                glm::vec2(position.x - 0.5f, position.z - 0.5f),
+                glm::vec2(position.x + 0.5f, position.z + 0.5f)
+            );
 
-        if(!scene_grid->resolve_path_) {
-            std::shared_ptr<SubTile> subtile = scene_grid->GetSubTileFromWorldPosition(
-                glm::vec2(position.x, position.z));
+            scene_grid->GenerateEmpty(box);
 
-            if(auto tile = subtile->parent.lock()) {
+            if(!scene_grid->resolve_path_) {
+                std::shared_ptr<SubTile> subtile = scene_grid->GetSubTileFromWorldPosition(
+                    glm::vec2(position.x, position.z));
 
-                int roomgroup_id = tile->roomgroup_id;
+                if(auto tile = subtile->parent.lock()) {
 
-                auto& waypoints = scene_grid->roomgroups_[roomgroup_id].waypoints;
-                waypoints.push_back(subtile);   
+                    int roomgroup_id = tile->roomgroup_id;
+
+                    auto& waypoints = scene_grid->roomgroups_[roomgroup_id].waypoints;
+                    waypoints.push_back(subtile);   
+                }
             }
         }
     }
@@ -790,6 +1013,9 @@ Thing Playground::SpawnAnObject(const std::string& file,
 
 	Thing object_temp;
 	object_temp.SetPtr(obj_wptr);
+    objects_.push_back(object_temp);
+
+    scene_->world_->BulletStep();
 
 	return object_temp;
 }
@@ -807,6 +1033,12 @@ void Playground::AttachCameraTo(Thing object, const boost::python::list offset_p
 	}
 
     agent_ = object;
+}
+
+void Playground::UpdateAttachCamera(const float pitch)
+{
+    float camera_pitch_ = glm::clamp(pitch, -45.0f, 45.0f);
+    scene_->world_->rotate_camera(main_camera_, camera_pitch_);
 }
 
 void Playground::FreeCamera(const boost::python::list position, 
@@ -927,9 +1159,17 @@ boost::python::dict Playground::GetActionSpace()
     return dictionary;
 }
 
+void Playground::HoldActions(const bool hold)
+{
+    hold_actions_ = hold;
+}
+
 boost::python::dict Playground::UpdateSimulationWithAction(const int action)
 {
     assert(action < 16 && action > -1);
+
+    if(hold_actions_)
+        return boost::python::dict();
 
     current_event_ = boost::python::list();
 
@@ -1028,11 +1268,12 @@ boost::python::dict Playground::UpdateSimulationWithAction(const int action)
             current_event_.append("DisableInteraction");
         }
         else if(action < boost::python::len(current_actions_)) {
-            TakeAction(action);
+            bool success = TakeAction(action);
 
             // Update Event
             current_event_.append("Action");
             current_event_.append(action);
+            current_event_.append(success ? "S" : "F");
         }
     } else if(inventory_opened_) {
         if(action == 13) {
@@ -1118,7 +1359,7 @@ boost::python::object Playground::GetCameraRGBDRaw()
 {
     unsigned char * raw_image = renderer_->GetRenderedImages()[0].data.data();
 
-    size_t destination_size = sizeof(unsigned char) * w_ * h_ * 4;
+    size_t destination_size = sizeof(unsigned char) * (w_ * h_ * 4);
 
     PyObject* py_buf = PyBuffer_FromReadWriteMemory(raw_image, destination_size);
     boost::python::object ret_val= boost::python::object(boost::python::handle<>(py_buf));
@@ -1244,13 +1485,12 @@ boost::python::list Playground::EnableInteraction()
     if(bullet_id >= 0) {
 
         // TODO
-        // Is bullet_handle_to_robot_map_fuuly functional?
+        // Is bullet_handle_to_robot_map_fully functional?
         auto object = bullet_world->bullet_handle_to_robot_map_[bullet_id];
 
         std::vector<std::string> actions = object->GetActions();
 
         for (int i = 0; i < actions.size(); ++i) {
-            // printf("action: %s\n", actions[i].c_str());
             ret.append(actions[i]);
         }
 
@@ -1268,7 +1508,7 @@ void Playground::DisableInteraction()
 void Playground::Attach()
 {
     glm::vec3 from = main_camera_->position_;
-    glm::vec3 to = main_camera_->front_ * 3.0f + from;
+    glm::vec3 to = main_camera_->front_ * kDistanceThreshold + from;
     
     auto bullet_world = scene_->world_;
     std::vector<RayTestInfo> temp_res;
@@ -1300,7 +1540,7 @@ std::string Playground::Grasp()
 		return "Nothing";
 
 	glm::vec3 from = main_camera_->position_;
-	glm::vec3 to = main_camera_->front_ * 3.0f + from;
+	glm::vec3 to = main_camera_->front_ * kDistanceThreshold + from;
 
     if(auto agent_sptr = agent_.GetPtr().lock())
     {
@@ -1316,7 +1556,7 @@ std::string Playground::PutDown()
 		return "Nothing";
 
 	glm::vec3 from = main_camera_->position_;
-	glm::vec3 to = main_camera_->front_ * 3.0f + from;
+	glm::vec3 to = main_camera_->front_ * kDistanceThreshold + from;
 
     if(auto agent_sptr = agent_.GetPtr().lock())
     {
@@ -1334,7 +1574,7 @@ std::string Playground::Rotate(const boost::python::list angle_py)
 	glm::vec3 angle = list2vec3(angle_py);
 
 	glm::vec3 from = main_camera_->position_;
-	glm::vec3 to = main_camera_->front_ * 3.0f + from;
+	glm::vec3 to = main_camera_->front_ * kDistanceThreshold + from;
 	
 	if(auto agent_sptr = agent_.GetPtr().lock())
     {
@@ -1344,7 +1584,7 @@ std::string Playground::Rotate(const boost::python::list angle_py)
     return "Nothing";
 }
 
-void Playground::TakeAction(const int action_id)
+bool Playground::TakeAction(const int action_id)
 {
 	// glm::vec3 from = main_camera_->Position;
 	// glm::vec3 to = main_camera_->Front * 3.0f + from;
@@ -1393,8 +1633,10 @@ void Playground::TakeAction(const int action_id)
     if(bullet_id >= 0 && action_id < boost::python::len(current_actions_)) {
     	auto object = bullet_world->bullet_handle_to_robot_map_[bullet_id];
 
-    	object->TakeAction(action_id);
+    	return object->TakeAction(action_id);
     }
+
+    return false;
 }
 
 void Playground::Use(const int object_id)
@@ -1516,29 +1758,20 @@ bool Playground::QueryContact(Thing& object)
 
 bool Playground::QueryObjectWithLabelAtCameraCenter(const std::string& label)
 {
-	std::vector<ObjectAttributes> temp;
-    scene_->world_->QueryObjectByLabel(label, temp);
+    glm::vec3 from = main_camera_->position_;
+    glm::vec3 to = main_camera_->front_ * kDistanceThreshold + from;
+    
+    auto bullet_world = scene_->world_;
+    std::vector<RayTestInfo> temp_res;
+    std::vector<Ray> temp_ray;
+    temp_ray.push_back({from, to});
 
-    for(int i = 0; i < temp.size(); ++i)
-    {
-    	glm::vec3 aabb_min = temp[i].aabb_min - glm::vec3(1);
-    	glm::vec3 aabb_max = temp[i].aabb_max + glm::vec3(1);
+    bullet_world->BatchRayTest(temp_ray, temp_res);
 
-    	if(aabb_min.x < main_camera_->position_.x &&
-    	   aabb_max.x > main_camera_->position_.x && 
-    	   aabb_min.z < main_camera_->position_.z &&
-    	   aabb_max.z > main_camera_->position_.z) 
-    	{
-    		// Check Aim
-    		glm::vec3 fromPosition = main_camera_->position_;
-    		glm::vec3 toPosition = main_camera_->front_ * 2.0f + fromPosition;
-    		int res = scene_->world_->RayTest(fromPosition, toPosition);
-
-    		if(res == temp[i].bullet_id) {
-    			return true;
-    			break;
-    		}
-    	}
+    if(temp_res[0].bullet_id >= 0) {
+        auto object = bullet_world->bullet_handle_to_robot_map_[temp_res[0].bullet_id];
+        
+        return object->robot_data_.label_ == label;
     }
 
     return false;
@@ -1699,9 +1932,11 @@ bool Playground::QueryObjectWithLabelNearMe(const std::string& label)
     return false;
 }
 
-void Playground::Teleport(Thing object, const boost::python::list position_py)
+void Playground::Teleport(Thing object, const boost::python::list position_py,
+                                        const boost::python::list orientation_py)
 {
 	glm::vec3 position = list2vec3(position_py);
+    glm::vec4 orientation = list2vec4(orientation_py);
 
 	if(auto object_sptr = object.GetPtr().lock())
 	{
@@ -1709,6 +1944,8 @@ void Playground::Teleport(Thing object, const boost::python::list position_py)
 
 		btTransform root_transform = root_part_->object_position_;
 		root_transform.setOrigin(btVector3(position.x, position.y, position.z));
+        root_transform.setRotation(btQuaternion(
+            btVector3(orientation.x, orientation.y, orientation.z), orientation.w));
 		scene_->world_->SetTransformation(object_sptr, root_transform);
 	}
 }

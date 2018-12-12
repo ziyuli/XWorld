@@ -625,14 +625,9 @@ void main()
     indirectLighting.rgb = pow(indirectLighting.rgb, vec3(2.2f));
     compositeLighting = (directLighting + indirectLighting.rgb) * indirectLighting.a;
     compositeLighting += emissive;
-
-
-    // Reinhard tone mapping
-    //compositeLighting = compositeLighting / (compositeLighting + 1.0f);
-
     compositeLighting = compositeLighting * pow(2.0, exposure);
 
-    // convert to gamma space
+
     const float gamma = 2.2;
     compositeLighting = pow(compositeLighting, vec3(1.0 / gamma));
 

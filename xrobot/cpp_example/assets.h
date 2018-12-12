@@ -30,6 +30,7 @@ static std::string object_with_action_1 = "/home/ziyuli/XWorld/xrobot/data/door.
 static std::string test_meta   = "/home/ziyuli/XWorld/xrobot/data/ModelCategoryMapping.csv";
 
 // OBJ Model
+static std::string spawn       = "/home/ziyuli/Desktop/spawn/vokselia_spawn.obj";
 static std::string bistro_in   = "/home/ziyuli/Desktop/bistro/interior.obj";
 static std::string bistro_ex   = "/home/ziyuli/Desktop/bistro/exterior.obj";
 static std::string sponza      = "/home/ziyuli/model/sponza/sponza.obj";

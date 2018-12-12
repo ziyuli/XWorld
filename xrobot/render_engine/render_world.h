@@ -95,9 +95,19 @@ public:
                     world_max_z_( 2),
                     debug_subtiles_(0),
                     debug_subtile_status_(0),
-                    highlight_center_(-1) {}
+                    highlight_center_(-1),
+                    icon_cache_(),
+                    icon_inventory_(0),
+                    inventory_size_(-1) {}
 
     virtual size_t size() const = 0;
+
+    void load_icon(const std::string& path) {
+        if(icon_cache_.find(path) == icon_cache_.end()) {
+            std::size_t ext = path.find_last_of(".");
+            icon_cache_[path] = -1;
+        }
+    }
 
     void set_world_size(const float min_x,
                         const float min_z,
@@ -144,7 +154,7 @@ public:
                        const float aspect_ratio = 4.0f / 3.0f,
                        const float fov = 60.0f,
                        const float near = 0.02f,
-                       const float far = 60.0f);
+                       const float far = 70.0f);
             
     void detach_camera(Camera* camera);
 
@@ -163,8 +173,11 @@ protected:
 
     int highlight_center_;
 
-// DEBUG
 public:
+    int inventory_size_;
+    std::vector<std::string> icon_inventory_;
+    std::map<std::string, int> icon_cache_;
+
     std::vector<std::pair<glm::vec2, glm::vec2>> debug_subtiles_;
     std::vector<int> debug_subtile_status_;
 };

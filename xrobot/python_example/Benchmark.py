@@ -7,7 +7,8 @@ import time
 import os
 import os.path
 
-suncg_dir   = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) + "/data/suncg";
+# suncg_dir   = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) + "/data/suncg";
+suncg_dir   = "/home/ziyuli/Desktop/suncg";
 suncg_meta  = suncg_dir + "/metadata/ModelCategoryMapping.csv";
 suncg_house = suncg_dir + "/house/00065ecbdd7300d35ef4328ffe871505/house.obj";
 
@@ -45,8 +46,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--num-proc', type=int, default=1)
 	parser.add_argument('--num-gpu', type=int, default=1)
-	parser.add_argument('--w', type=int, default=240)
-	parser.add_argument('--h', type=int, default=180)
+	parser.add_argument('--w', type=int, default=120)
+	parser.add_argument('--h', type=int, default=90)
 	parser.add_argument('--num-iter', type=int, default=5000)
 	parser.add_argument('--quality', type=int, default=0)
 	parser.add_argument('--simulation', type=int, default=1)

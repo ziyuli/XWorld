@@ -189,33 +189,24 @@ class XWorld3DTask(object):
 	def get_stages(self):
 		return "idle"
 
-	# Debug
-
-	def display_rgb(self, sentence, w = 640, h = 360):
-		image_str = self.env.GetCameraRGBDRaw()
-		image_rgbd = np.fromstring(image_str, np.uint8).reshape( h, w, 4 )
-		image_rgbd = cv2.cvtColor(image_rgbd, cv2.COLOR_BGRA2RGBA)
-		image_rgbd = cv2.flip(image_rgbd, 0)
-
-		image_rgbd_resize = cv2.resize(image_rgbd, None, fx=0.8, fy=0.8)
-		image_rgb = np.array(image_rgbd_resize[:,:,:3])
-
-		cv2.putText(image_rgb, sentence, (30,30), \
-			cv2.FONT_HERSHEY_PLAIN, 1.0, (255,15,15), 1, cv2.LINE_AA);
-
-		cv2.imshow("RGB", image_rgb)
 
 class Task(object):
 	def __init__(self, task_name, task):
 		self.task_name = task_name
 		self.stages = task.get_stages()
 		self.currt_stage = "idle"
+		self.currt_reward = 0.0
+		self.currt_sentence = ""
 		self.task = task;
 		self.env = None
 
 	def run_stage(self):
 		
-		self.current_stage = self.stages[self.current_stage]()[0]
+		res = self.stages[self.current_stage]()
+
+		self.current_stage = res[0]
+		self.currt_reward = res[1]
+		self.currt_sentence = res[2]
 
 	def register_stage(self, stage_name, func):
 		self.stages[stage_name] = func
@@ -238,6 +229,7 @@ class TaskGroup(object):
 		self.busy_task = None
 		self.task_weights = []
 		self.task_list = []
+		self.reward = 0.0
 
 	def add_task(self, task_name, task_stage, weight = 0):
 		task = Task(task_name, task_stage)
@@ -272,3 +264,7 @@ class TaskGroup(object):
 
 	def get_group_name(self):
 		return self.group_name
+
+	def get_sentence(self):
+		if self.busy_task != None:
+			return self.busy_task.currt_sentence

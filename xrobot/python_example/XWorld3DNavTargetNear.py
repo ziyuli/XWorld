@@ -1,3 +1,4 @@
+from libxrobot import *
 from teaching_task import *
 import cv2
 import numpy as np
@@ -50,8 +51,6 @@ class XWorld3DNavTargetNear(XWorld3DTask):
 		reward, time_out = self._time_reward()
 		next_stage = "navigation"
 
-		super(XWorld3DNavTargetNear, self).display_rgb(self.sentence)
-
 		if not time_out:
 			object_at_center = self.env.QueryObjectAtCameraCenter()
 			if object_at_center.GetLabel() != "Nothing" and \
@@ -60,13 +59,13 @@ class XWorld3DNavTargetNear(XWorld3DTask):
 				if object_at_center in self.near_objects:
 					print "Find"
 					reward = self._successful_goal(reward)
-					next_stage = "navigation"
+					next_stage = "terminal"
 				else:
 					print "Wrong"
 					reward = self._failed_goal(reward)
-					next_stage = "navigation"
+					next_stage = "terminal"
 		else:
-			next_stage = "navigation"
+			next_stage = "terminal"
 
 		return [next_stage, reward, self.sentence]
 
@@ -98,3 +97,80 @@ class XWorld3DNavTargetNear(XWorld3DTask):
 		G --> %s
 		""" % all_goal_names
 		return grammar_str, "S"
+
+class XWorld3DEnv(object):
+	def __init__(self):
+		self.env = Playground(640, \
+							  480, \
+							  HEADLESS, \
+							  RENDER_QUALITY_NORMAL, \
+							  1)
+
+		self.task_group = TaskGroup("TaskGroup")
+		self.task_group.add_task("NavTargetNear", XWorld3DNavTargetNear(self.env))
+		self.first = True
+
+	def reset(self):
+		self.env.Clear()
+
+	def step(self, action):
+
+		if self.first != True:
+			self.env.UpdateSimulationWithAction(action)
+
+		self.first = False
+		self.task_group.run_stage()
+		sentence = self.task_group.get_sentence()
+
+		self.env.UpdateRenderer()
+		image_str = self.env.GetCameraRGBDRaw()
+		image_rgbd = np.fromstring(image_str, np.uint8).reshape( 480, 640, 4 )
+		image_rgbd = cv2.flip(image_rgbd, 0)
+		image_rgbd_resize = cv2.resize(image_rgbd, None, fx=0.8, fy=0.8)
+		image_rgb = np.array(image_rgbd_resize[:,:,:3])
+		image_d   = np.array(image_rgbd_resize[:,:,3:4])
+
+		cv2.putText(image_rgb, sentence, (30,30), \
+			cv2.FONT_HERSHEY_PLAIN, 1.25, (15,255,15), 1, cv2.LINE_AA);
+		cv2.imshow("RGB", image_rgb)
+
+	def render(self):
+		self.env.UpdateRenderer()
+
+	def game_over(self):
+		return False
+
+def main():
+
+	env = XWorld3DEnv()
+	
+	while (not env.game_over()):
+
+		action = NO_ACTION
+
+		# action inputs from keyboard
+		key = cv2.waitKey(0)
+		if key == 119:   # W
+			action = 0
+		elif key == 97:  # A
+			action = 2
+		elif key == 115: # S
+			action = 1
+		elif key == 100: # D
+			action = 3
+		elif key == 49:  # kp1 Pick
+			action = 8
+		elif key == 50:  # kp2 Drop
+			action = 9
+		elif key == 48:  # kp9 Up
+			action = 4
+		elif key == 57:  # kp0 Down
+			action = 5
+		elif key == 27:  # ESC
+			break
+
+		# update
+		env.step(action)
+
+if __name__ == '__main__':
+    main()

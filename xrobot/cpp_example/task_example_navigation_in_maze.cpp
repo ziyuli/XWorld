@@ -44,9 +44,9 @@ namespace xrobot
 		// Load Assets
 		scene_->world_->LoadMetadata(test_meta.c_str());
 		scene_->world_->AssignTag(apple, "apple");
-		scene_->CreateAndLoadTileURDF(floor_0);
-		scene_->CreateAndLoadTileURDF(floor_1);
-		scene_->LoadWallURDF(wall);
+		scene_->CreateAndLoadTileURDF(test_floor);
+		// scene_->CreateAndLoadTileURDF(floor_1);
+		scene_->LoadWallURDF(test_wall);
 		scene_->CreateAndLoadKeyURDF(key_red, "red");
 		scene_->CreateAndLoadKeyURDF(key_blue, "blue");
 		scene_->CreateAndLoadKeyURDF(key_yellow, "yellow");
@@ -174,14 +174,15 @@ namespace xrobot
         }
 
         // Reset After N Steps
-        if(iterations_++ > 12000) 
-        	return "idle";
+        // if(iterations_++ > 12000) 
+        // 	return "idle";
 
         // Step Simulation and Renderer
         scene_->world_->BulletStep();   
         renderer_->StepRender(scene_->world_.get());
         ctx_->SwapBuffer();
         ctx_->PollEvent();
+
 
         return "NavTarget";
 	}
