@@ -462,9 +462,6 @@ void Playground::CreateRandomGenerateScene()
 
 void Playground::LoadXWorldScene(const std::string& filename)
 {
-    std::shared_ptr<MapGrid> scene_grid 
-        = std::dynamic_pointer_cast<MapGrid>(scene_);
-
     scene_->world_->inventory_size_ = 0;
 
     boost::python::dict scene_dict;
@@ -528,7 +525,7 @@ void Playground::LoadXWorldScene(const std::string& filename)
         if (GetJsonObjectMember(json_value, json_size, "max_z"))
             max_z = json_value->asFloat();
 
-        scene_grid->world_->set_world_size(min_x, min_z, max_x, max_z);
+        scene_->world_->set_world_size(min_x, min_z, max_x, max_z);
     }
 
     // Parse levels
@@ -877,17 +874,13 @@ void Playground::CreateSceneFromSUNCG()
 void Playground::CreateEmptyScene(const float min_x, const float max_x,
                                   const float min_z, const float max_z)
 {
-    if(!scene_)
+    if(!scene_) {
         scene_ = std::make_shared<Map>();
-
-    std::shared_ptr<Map> scene_generic 
-        = std::dynamic_pointer_cast<Map>(scene_);
+        scene_->GenerateGenetricMap();
+    }
 
     scene_->world_->inventory_size_ = 0;
-
-    scene_generic->GenerateGenetricMap();
-
-    scene_generic->world_->set_world_size(min_x, min_z, max_x, max_z);
+    scene_->world_->set_world_size(min_x, min_z, max_x, max_z);
 
     renderer_->sunlight_.direction = glm::vec3(0.3, 1, 1);
     renderer_->lighting_.exposure = 1.0f;

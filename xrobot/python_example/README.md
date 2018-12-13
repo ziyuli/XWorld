@@ -3,8 +3,9 @@ Examples
 
 # Task Examples
 
+- `Dialog.sh`: Teach agent navigate and pick up
 - `StackBoxes.sh`: Stack all three boxes in the scene
-- `CutCake.sh`: Find cake knife abd cut the cake
+- `CutCake.sh`: Find cake knife and cut the cake
 - `NavTarget.sh`: Navigate to the goal
 - `NavTargetAvoid.sh`: Avoid the goal
 - `NavTargetBetween.sh`: Navigate between two goals
@@ -13,11 +14,18 @@ Examples
 - `NavTargetInMaze.sh`: Navigate to the goal in the maze (and use matching key to open the locked door)
 - `NavTargetInSUNCG.sh`: Navigate to the goal in a SUNCG scene
 
+# Experiment
+
+- `Interactive.sh`: Interactive edit static scene 
+
 # Demo
 
 - `InteractionDemo.sh`: Examples of several interactable objects
-- `LoadXWorldSceneDemo.sh`: Examples of loading \*.xworld scene
 
 # Benchmark 
 
+The benchmark requires SUNCG OBJ+MTL insteads of JSON. The conversion tool is provided by SUNCGtoolbox (https://github.com/shurans/SUNCGtoolbox).
+
 - `Benchmark.sh`: SUNCG Benchmark
+
+
