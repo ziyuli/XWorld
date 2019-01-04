@@ -956,6 +956,10 @@ bool RobotWithConvertion::TakeAction(const int act_id) {
     RemoveRobotFromBullet();
     bullet_world->RemoveObjectWithLabel(body_data_.body_uid);
 
+    bool fixed = body_data_.fixed;
+    bool pickable = body_data_.pickable;
+
+    body_data_ = BulletBodyData();
     body_data_.label = label_;
     BulletBody::load_urdf(
             bullet_world->client_,
@@ -963,7 +967,7 @@ bool RobotWithConvertion::TakeAction(const int act_id) {
             pos,
             quat,
             scale_,
-            body_data_.fixed, /*fixed_base*/
+            fixed, /*fixed_base*/
             false, /*self_collision*/
             true, /*use_multibody*/
             false /*concave*/);
@@ -971,9 +975,10 @@ bool RobotWithConvertion::TakeAction(const int act_id) {
     load_robot_shapes(scale_);
 
     bullet_world->id_to_robot_[body_data_.body_uid] = shared_from_this();
-    status_ = act_id;    
-
     bullet_world->AddObjectWithLabel(label_, body_data_.body_uid);
+    UpdatePickable(pickable);
+
+    status_ = act_id;    
     return true;
 }
 

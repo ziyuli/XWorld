@@ -24,6 +24,7 @@
 #include "capture.h"
 #include "visualization.h"
 #include "render_world.h"
+#include "terrain.h"
 
 namespace xrobot {
 namespace render_engine {
@@ -158,9 +159,10 @@ private:
 
     // Visualization
     std::shared_ptr<Visualization> visualize_;
+    std::shared_ptr<Capture> capture_;
 
     // Experimental
-    std::shared_ptr<Capture> capture_;
+    std::shared_ptr<Terrain> terrain_;
 };
 
 }

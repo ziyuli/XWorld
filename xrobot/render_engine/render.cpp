@@ -57,6 +57,9 @@ Render::Render(const int width,
 	InitPostProcessing();
 	InitVisualization();
 	InitLidarCapture();
+
+	// Experimental!!!
+	terrain_ = std::make_shared<Terrain>(128);
 }
 
 Render::~Render() {
@@ -131,18 +134,21 @@ void Render::StepRender(RenderWorld* world) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	if(profile_.visualize) {
 
-		float width_quater  = width_ * 0.25f;
-		float height_quater = height_ * 0.25f;
+		// float width_quater  = width_ * 0.25f;
+		// float height_quater = height_ * 0.25f;
 
-		RenderTexture(visualize_->GetTexture(), width_, height_);
-		RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
-				10, 10, false);
-		RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
-				width_quater + 20, 10, true);
+		// RenderTexture(visualize_->GetTexture(), width_, height_);
+		// RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
+		// 		10, 10, false);
+		// RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
+		// 		width_quater + 20, 10, true);
 
-		if(profile_.multirays) 
-			RenderTexture(capture, 280, 70, 
-					width_quater * 2 + 30, 10, true, 0);
+		// if(profile_.multirays) 
+		// 	RenderTexture(capture, 280, 70, 
+		// 			width_quater * 2 + 30, 10, true, 0);
+
+		RenderTexture(terrain_->noise_->texture_id(0), 128, 128);
+		RenderTexture(terrain_->lightmap_->texture_id(0), 128, 128, 128);
 	}
 
 	// Swap

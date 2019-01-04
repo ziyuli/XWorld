@@ -1097,7 +1097,7 @@ glm::vec3 MapGrid::GenerateLayout(const int w, const int l, const int n, const i
 							doors_map_[edge01] = door_center;
 							doors_map_[edge10] = door_center;
 
-							if(doors_list_.size()) {
+							if(door_id_list.size()) {
 								int generate_door_id = door_id_list.back();
 								door_id_list.pop_back();
 
