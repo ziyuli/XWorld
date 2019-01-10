@@ -32,7 +32,7 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 ## -Wno-error for gcc 5.x
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wno-deprecated-declarations -Wno-error")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_DEBUG "-ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native")
 
 find_package(Threads REQUIRED)
@@ -121,6 +121,16 @@ if(BUILD_CPP_EXAMPLES)
   target_link_libraries(xrobot_test_suncg PUBLIC xrobot ${DEP_LIBS})
   target_include_directories(xrobot_test_suncg PUBLIC ${DEP_INCLUDES})
   set_target_properties(xrobot_test_suncg
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cpp_example)
+
+  # Terrain 
+  add_executable(xrobot_test_terrain
+    cpp_example/example_test_terrain.cpp
+    cpp_example/test_terrain.cpp)
+  add_dependencies(xrobot_test_nav xrobot)
+  target_link_libraries(xrobot_test_terrain PUBLIC xrobot ${DEP_LIBS})
+  target_include_directories(xrobot_test_terrain PUBLIC ${DEP_INCLUDES})
+  set_target_properties(xrobot_test_terrain
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cpp_example)
 endif()
 

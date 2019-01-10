@@ -11,6 +11,7 @@
 #include "common.h"
 #include "gl_context.h"
 #include "shader.h"
+#include "terrain.h"
 #include "texture2d.h"
 #include "render_target.h"
 #include "render_world.h"
@@ -48,13 +49,14 @@ public:
 	void DrawBatchRays();
 	void UpdateRay(const int offset, const glm::vec3 from, const glm::vec3 to);
 	void InitDrawBatchRays(const int rays);
+	void InitDrawTerrain(std::shared_ptr<Terrain> terrain);
 	void Draw(RenderWorld* world, const Shader& shader);
 
 	void GetDeltaTime();
     void ProcessInput();
     void ProcessMouse();
 
-private:
+// private:
     Camera free_camera_;
     float last_x_, last_y_, delta_time_;
     bool first_mouse_;
@@ -70,6 +72,7 @@ private:
     GLuint aabb_vao_, aabb_vbo_;
     GLuint batch_ray_vao_, batch_ray_vbo_;
 
+    std::shared_ptr<Terrain> terrain_;
     std::shared_ptr<RenderTarget> visualization_;
 };
 

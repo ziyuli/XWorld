@@ -1,0 +1,81 @@
+#version 410 core
+
+layout (vertices = 4) out;
+
+in VS_OUT {
+	vec2 tc;
+	int instance_id;
+} tcs_in[];
+
+out TCS_OUT {
+	vec2 tc;
+} tcs_out[];
+
+uniform int terrain_size;
+uniform int chunk_size;
+uniform float lod_factor = 1.0;
+uniform float lod_near = 0.5;
+uniform float lod_far = 15.0;
+uniform vec3 camera_pos;
+
+const float min_level = 1.0;
+const float max_level = 40.0;
+
+int lod(ivec2 chunk_pos)
+{
+	vec3 real_pos;
+	real_pos.x = float(chunk_pos.x) * chunk_size + (chunk_size / 2.0);
+	real_pos.y = 0.0;
+	real_pos.z = float(chunk_pos.y) * chunk_size + (chunk_size / 2.0);
+
+        float dist = distance(camera_pos, real_pos);
+
+        if (dist < lod_far)
+        {
+            //full detail
+            if (dist < lod_near)
+            {
+                return int(max_level * lod_factor);
+            }
+            //interpolate
+            else
+            {
+                float gap = lod_far - lod_near;
+                float perc = lod_far - dist;
+
+                float level_gap = max_level - min_level;
+
+                return int((perc / gap * level_gap) + min_level);
+            }
+        }
+        //least detail
+        else
+            return int(min_level);
+}
+
+
+void main()
+{
+	if (gl_InvocationID == 0)
+	{
+		int chunks_per_side = terrain_size / chunk_size;
+		ivec2 chunk_pos;
+		chunk_pos.x = tcs_in[0].instance_id % chunks_per_side;
+		chunk_pos.y = tcs_in[0].instance_id / chunks_per_side;
+
+		int inner = lod(chunk_pos);
+
+		gl_TessLevelOuter[0] = inner;
+		gl_TessLevelOuter[1] = inner;
+		gl_TessLevelInner[0] = inner;
+		gl_TessLevelInner[1] = inner;
+
+		//succumb to your neighbor to avoid cracking
+		gl_TessLevelOuter[2] = lod(chunk_pos+ivec2(0,1));
+		gl_TessLevelOuter[3] = lod(chunk_pos+ivec2(1,0));
+	}
+	
+	
+	tcs_out[gl_InvocationID].tc = tcs_in[gl_InvocationID].tc;
+	gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+}

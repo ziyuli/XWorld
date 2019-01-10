@@ -24,7 +24,8 @@ uniform int diffuseMap = 0;
 
 // Light
 uniform vec3 light_directional = -vec3(1, 2, 3);
-
+uniform vec3 up_ambient = vec3(0.1);
+uniform vec3 low_ambient = vec3(0.8);
 
 float lum(vec3 color) { return dot(color, vec3(1)); }
 
@@ -80,10 +81,14 @@ void main()
     vec3 L = normalize(light_directional);
 
     // Lambert
-    float lambert = max(0, dot(N, L));
+    vec3 lambert = max(0, dot(N, L)) * diffuse;
+
+    // Ambient
+    float w = 0.5 * (1.0 + dot(vec3(0,1,0), N));
+    vec3 ambient = (w * up_ambient + (1.0 - w) * low_ambient) * diffuse;
 
     // Shading
-    vec3 outColor = lambert * diffuse + 0.45 * diffuse;
+    vec3 outColor = lambert + ambient;
     FragColor.rgb = outColor;
 }
 

@@ -6,6 +6,58 @@ namespace xrobot {
 using namespace render_engine;
 using namespace bullet_engine;
 
+Terrain::Terrain(const WorldWPtr& bullet_world) : BulletTerrain(),
+                                                  bullet_world_(bullet_world),
+                                                  data_(NULL),
+                                                  collision_shape_(false) {}
+
+Terrain::~Terrain() {
+    if(data_) {
+        free(data_);
+        data_ = NULL;
+    }
+}
+
+void Terrain::load_terrain_from_height_map() {
+    float* data = height_data_.data();
+    int grid_size_1 = grid_size_ + 1;
+    int grid_count  = grid_size_1 * grid_size_1;
+    height_t highest = -100.0;
+    height_t lowest = 100.0;
+
+    data_ = (byte_t*) malloc(grid_count * sizeof(height_t));
+
+    for (int i = 0; i < grid_size_1; ++i){
+        for (int j = 0; j < grid_size_1; ++j){
+            int idx = (j * grid_size_1) + i;
+            long offset = ((long) sizeof(height_t)) * idx;
+            height_t* pf = (height_t *)(data_ + offset);
+            height_t z = 0.0f;
+
+            if(i < grid_size_ && j < grid_size_) {
+                z = ((float*) data)[j * grid_size_ + i];
+            }
+
+            *pf = z;
+            highest = std::max(highest, z);
+            lowest = std::min(lowest, z);
+        }
+    }
+
+    auto bullet_world = wptr_to_sptr(bullet_world_);
+    load_terrain(bullet_world->client_, data_,
+            grid_size_1, terrain_size_, lowest, highest);
+    collision_shape_ = true;
+}
+
+void Terrain::RemoveTerrainFromBullet() {
+    if(collision_shape_) {
+        auto bullet_world = wptr_to_sptr(bullet_world_);
+        remove_from_bullet(bullet_world->client_);
+    }
+}
+
+
 World::World() : BulletWorld(),
                  id_to_robot_(),
                  recycle_robot_map_(),
@@ -13,7 +65,8 @@ World::World() : BulletWorld(),
                  object_locations_(),
                  reset_count_(0),
                  pickable_list_(),
-                 tag_list_() {}
+                 tag_list_(),
+                 terrain_(nullptr) {}
 
 World::~World() {
     CleanEverything();
@@ -179,6 +232,16 @@ std::weak_ptr<RobotBase> World::LoadRobot(
             label, fixed_base, mass, flip, concave);
 }
 
+void World::GenerateTerrain(const int grid_size, const int terrain_size,
+        TerrainDatas_t* terrain_data) {
+    if(!terrain_) {
+        terrain_ = std::make_shared<Terrain>(shared_from_this());
+        terrain_->grid_size_ = grid_size;
+        terrain_->terrain_size_ = terrain_size;
+        terrain_->terrain_data_ = terrain_data;
+        terrain_->update_ = true;
+    }
+}
 
 std::weak_ptr<RobotBase> World::LoadRobot(
         const std::string& filename,
@@ -404,6 +467,10 @@ void World::RemoveRobot(const RobotBaseWPtr& rm_robot) {
 }
 
 void World::CleanEverything2() {
+    if(terrain_) {
+        terrain_->RemoveTerrainFromBullet();
+        terrain_.reset();
+    }
 
     for (auto& kv : id_to_robot_) {
         kv.second->reset_move();
@@ -439,6 +506,11 @@ void World::PrintCacheInfo() {
 }
 
 void World::CleanEverything() {
+    if(terrain_) {
+        terrain_->RemoveTerrainFromBullet();
+        terrain_.reset();
+    }
+
     reset_count_++;
 
     remove_all_cameras();
@@ -817,7 +889,13 @@ RenderBody* World::next_robot() {
     if (robot_it_ == id_to_robot_.end()) {
         return NULL;
     } else {
+        // if (!robot_it_->second.get()) {
+        //     printf("###################################\n");
+        // }
         RenderBody* ret = static_cast<RenderBody*>(robot_it_->second.get());
+        // if (!ret) {
+        //     printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+        // }
         robot_it_++;
         return ret;
     }
@@ -825,6 +903,15 @@ RenderBody* World::next_robot() {
 
 bool World::has_next_robot() const {
     return robot_it_ != id_to_robot_.end();
+}
+
+bool World::has_terrain() const {
+    return terrain_ != nullptr;
+}
+
+RenderTerrain* World::get_terrain() {
+    RenderTerrain* ret = static_cast<RenderTerrain*>(terrain_.get());
+    return ret;
 }
 
 }

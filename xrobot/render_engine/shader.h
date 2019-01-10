@@ -23,6 +23,12 @@ public:
 
     Shader(const std::string& vertexPath,
            const std::string& fragmentPath, 
+           const std::string& controlPath,
+           const std::string& evaluationPath,
+           const std::string& geometryPath);
+
+    Shader(const std::string& vertexPath,
+           const std::string& fragmentPath, 
            const std::string& controlPath = "",
            const std::string& evaluationPath = "");
 

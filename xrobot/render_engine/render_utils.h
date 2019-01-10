@@ -12,6 +12,8 @@ namespace render_engine {
 
 GLuint LoadCubemap(const std::vector<std::string>& faces);
 
+unsigned int LoadTextureArray(const std::vector<std::string>& path);
+
 unsigned int HDRTextureFromFile(const char *path);
 
 unsigned int TextureFromFile(

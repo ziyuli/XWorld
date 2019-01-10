@@ -43,6 +43,50 @@ GLuint LoadCubemap(const std::vector<std::string>& faces) {
     return textureID;
 }
 
+unsigned int LoadTextureArray(const std::vector<std::string>& path) {
+
+    unsigned int texture_array;
+    int layers = path.size();
+    int miplevels = 4;
+
+    glGenTextures(1, &texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, miplevels, GL_RGB8, 1024, 1024, layers);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGB8, 1024, 1024, layers, 0,  GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGB8, 1024 / 2, 1024 / 2, layers, 0,  GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 2, GL_RGB8, 1024 / 4, 1024 / 4, layers, 0,  GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 3, GL_RGB8, 1024 / 8, 1024 / 8, layers, 0,  GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+    for (int i = 0; i < layers; ++i) {
+
+        int width, height, nrComponents;
+        unsigned char *data = stbi_load(
+                path[i].c_str(), &width, &height, &nrComponents, 0);
+        if (data) {
+            GLenum format;
+            if (nrComponents == 1) {
+                format = GL_RED;
+            } else if (nrComponents == 3) {
+                format = GL_RGB;
+            } else if (nrComponents == 4) {
+                format = GL_RGBA;
+            }
+
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 
+                    0, 0, 0, i, width, height, 1, format, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+    }
+    
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_REPEAT);
+
+    return texture_array;
+}
+
 unsigned int HDRTextureFromFile(const char* path){
 
     unsigned int hdrTexture;

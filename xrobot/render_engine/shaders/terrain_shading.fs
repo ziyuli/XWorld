@@ -4,16 +4,11 @@ out vec3 FragColor;
 noperspective in vec2 TexCoords;
 
 uniform sampler2D height_map;
-// uniform sampler2DArray textures;
-// uniform lowp int textures_size;
-
-uniform float ambient = 0.1;
-uniform vec3 dlight = vec3(1, 2, 3);
-
-const ivec3 off = ivec3(-1,0,1);
-const vec2 size = vec2(2.0,0.0);
+uniform float scale = 40.0f / 256.0f;
 
 vec4 normal() {
+    ivec3 off = ivec3(-1,0,1);
+    vec2 size = vec2(2.0,0.0) * scale;
     vec4 height = texture(height_map, TexCoords);
     float s11 = height.x;
     float s01 = textureOffset(height_map, TexCoords, off.xy).x;
@@ -26,9 +21,5 @@ vec4 normal() {
 }
 
 void main() {
-	vec4  normalHeight = normal();
-	float height = normalHeight.w;
-	float diffuse = max(0.0, dot(normalHeight.xyz, normalize(dlight)));
-	float irradiance = ambient + diffuse;
-	FragColor = vec3(irradiance);
+	FragColor = normalize(normal().xyz);
 }

@@ -16,6 +16,7 @@
 #include "bullet_engine/bullet_object.h"
 #include "bullet_engine/bullet_body.h"
 #include "bullet_engine/bullet_world.h"
+#include "bullet_engine/bullet_terrain.h"
 #include "render_engine/model.h"
 #include "render_engine/render_world.h"
 
@@ -31,6 +32,7 @@ typedef float xScalar;
 #endif
 
 class Inventory;
+class Terrain;
 class RobotBase;
 class World;
 
@@ -38,6 +40,10 @@ typedef std::shared_ptr<RobotBase> RobotBaseSPtr;
 typedef std::weak_ptr<RobotBase> RobotBaseWPtr;
 typedef std::shared_ptr<World> WorldSPtr;
 typedef std::weak_ptr<World> WorldWPtr;
+typedef std::shared_ptr<Terrain> TerrainSptr;
+typedef std::weak_ptr<Terrain> TerrainWptr;
+typedef unsigned char byte_t; 
+typedef double height_t;
 
 class Joint : public bullet_engine::BulletJoint {
 public:
@@ -399,10 +405,29 @@ struct ObjectAttributes {
     int bullet_id;
 };
 
+class Terrain : public render_engine::RenderTerrain,
+                public bullet_engine::BulletTerrain,
+                public std::enable_shared_from_this<Terrain>  {
+    using RenderTerrain = render_engine::RenderTerrain;
+public:
+    Terrain(const WorldWPtr& bullet_world);
+    ~Terrain();
+
+    void load_terrain_from_height_map() override;
+
+    void RemoveTerrainFromBullet();
+
+private:
+    bool collision_shape_;
+    byte_t* data_;
+    WorldWPtr bullet_world_;
+};
+
 class World : public render_engine::RenderWorld,
               public bullet_engine::BulletWorld,
               public std::enable_shared_from_this<World> {
     using RenderBody = render_engine::RenderBody;
+    using RenderTerrain = render_engine::RenderTerrain;
 public:
     World();
     ~World();
@@ -412,6 +437,9 @@ public:
     void AssignTag(const std::string& path, const std::string& tag);
 
     void UpdatePickableList(const std::string& tag, const bool pick);
+
+    void GenerateTerrain(const int grid_size, const int terrain_size, 
+            TerrainDatas_t* terrain_data);
 
     RobotBaseWPtr LoadRobot(
             const std::string& filename,
@@ -499,13 +527,17 @@ public:
     
     bool has_next_robot() const override;
 
+    RenderTerrain* get_terrain() override;
+
+    bool has_terrain() const override;
+
     std::map<std::string, std::string> tag_list_;
     std::map<std::string, bool> pickable_list_;
     std::map<int, RobotBaseSPtr> id_to_robot_;
     std::map<std::string, std::vector<RobotBaseSPtr>> recycle_robot_map_;
     std::map<std::string, render_engine::ModelDataSPtr> model_cache_;
     std::map<std::string, std::vector<int>> object_locations_;
-
+    TerrainSptr terrain_;
     int reset_count_;
  
 private:

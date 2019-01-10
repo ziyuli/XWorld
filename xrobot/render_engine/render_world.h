@@ -11,6 +11,22 @@
 #include "model.h"
 
 namespace xrobot {
+
+struct TerrainData {
+    TerrainData() : texture_layer_id(0), height(0), occupy(false) {}
+    TerrainData(const unsigned int id, 
+                const float h, 
+                const bool o) : texture_layer_id(id),
+                                height(h),
+                                occupy(o) {}
+                                
+    unsigned int texture_layer_id;
+    float height;
+    bool occupy;
+};
+
+typedef std::vector<TerrainData> TerrainDatas_t;
+
 namespace render_engine {
 
 class RenderPart {
@@ -83,6 +99,25 @@ protected:
     bool hide_;
     bool baking_;
     bool recycle_;
+};
+
+class RenderTerrain {
+public:
+    RenderTerrain() : grid_size_(0),
+                      terrain_size_(0),
+                      update_(false),
+                      height_data_(0),
+                      terrain_data_(0) {}
+
+    virtual ~RenderTerrain() {}
+
+    virtual void load_terrain_from_height_map() = 0;
+
+    int grid_size_;
+    int terrain_size_;
+    bool update_;
+    std::vector<float> height_data_;
+    TerrainDatas_t* terrain_data_;
 };
 
 class RenderWorld {
@@ -169,6 +204,11 @@ public:
 
     void rotate_camera(Camera* camera, const float pitch);
 
+    // terrain
+    virtual bool has_terrain() const = 0;
+
+    virtual RenderTerrain* get_terrain() = 0;
+
 protected:
     std::vector<Camera*> cameras_;
     std::map<Camera*, RenderBody*> camera_to_body_;
@@ -179,6 +219,7 @@ protected:
     float world_max_z_;
 
 public:
+    
     int highlight_center_;
     int inventory_size_;
     std::vector<std::string> icon_inventory_;

@@ -2,6 +2,7 @@
 #define RENDER_ENGINE_RENDER_H_
 
 #define EXPERIMENTAL_LIDAR
+#define EXPERIMENTAL_TERRAIN
 
 #include <chrono>
 #include <ctime>
@@ -75,6 +76,11 @@ public:
     void UpdateLightDirection(const glm::vec3 direction) {
         dir_light_.direction = direction;
     }
+    std::vector<float> GetTerrainHeightData() const {
+        if(terrain_) 
+            return terrain_->GetHeightMapData();
+        return std::vector<float>();
+    }
 
 private:
 
@@ -91,6 +97,9 @@ private:
 
     // Shaders
     void InitShaders();
+
+    // Terrain
+    void RenderTerrainHeightMap(RenderWorld* world);
 
     // Deferred
     void RenderQuad();

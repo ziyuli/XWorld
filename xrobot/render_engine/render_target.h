@@ -27,10 +27,12 @@ public:
 	void append_bgra_uint8();
 	void append_rgba_float32();
 	void append_rgba_float16();
+	void append_rgba_float16_bilinear();
 	void append_rgb_float32();
 	void append_rgb_float16();
 	void append_rgb_uint8();
 	void append_rgb_float();
+	void append_rgb_float_bilinear();
 	void append_r_float();
 	void append_r_uint8();
 	void append_depth();

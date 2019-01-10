@@ -57,9 +57,6 @@ Render::Render(const int width,
 	InitPostProcessing();
 	InitVisualization();
 	InitLidarCapture();
-
-	// Experimental!!!
-	terrain_ = std::make_shared<Terrain>(128);
 }
 
 Render::~Render() {
@@ -85,6 +82,17 @@ void Render::CheckVersion() {
 			CloseContext(ctx_);
 			exit(0);
 		}
+	} else if(terrain_) {
+		if(major < 4 || major == 4 && minor < 1) {
+			printf("[Renderer] Terrain requires at least OpenGL 4.1\n");
+			if(profile_.visualize)
+				printf("[Renderer] The driver or hardware is not OpenGL 4.2 compatible\n\n");
+			else
+				printf("[Renderer] Disable headless rendering!\n\n"); 
+			ctx_->PrintInfo();
+			CloseContext(ctx_);
+			exit(0);
+		}
 	} else {
 		if(major < 3 || major == 3 && minor < 3) {
 			printf("[Renderer] Renderer requires at least OpenGL 3.3\n\n");
@@ -100,8 +108,10 @@ void Render::CheckVersion() {
 void Render::StepRender(RenderWorld* world) {
 	if(!world->cameras_size()) return;
 	Camera* camera = world->camera(0);
-
 	GLuint out, capture;
+
+	// Terrain
+	RenderTerrainHeightMap(world);
 
 	// Visualization
 	RenderVisualization(world, camera);
@@ -134,21 +144,28 @@ void Render::StepRender(RenderWorld* world) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	if(profile_.visualize) {
 
-		// float width_quater  = width_ * 0.25f;
-		// float height_quater = height_ * 0.25f;
+		float width_quater  = width_ * 0.25f;
+		float height_quater = height_ * 0.25f;
 
-		// RenderTexture(visualize_->GetTexture(), width_, height_);
-		// RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
-		// 		10, 10, false);
-		// RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
-		// 		width_quater + 20, 10, true);
+		RenderTexture(visualize_->GetTexture(), width_, height_);
+		RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
+				10, 10, false);
+		RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
+				width_quater + 20, 10, true);
 
 		// if(profile_.multirays) 
 		// 	RenderTexture(capture, 280, 70, 
 		// 			width_quater * 2 + 30, 10, true, 0);
 
-		RenderTexture(terrain_->noise_->texture_id(0), 128, 128);
-		RenderTexture(terrain_->lightmap_->texture_id(0), 128, 128, 128);
+		// glm::mat4 projection = visualize_->free_camera_.GetProjectionMatrix();
+		// glm::mat4 view = visualize_->free_camera_.GetViewMatrix();
+		// glm::vec3 camera_pos = visualize_->free_camera_.position_;
+		// glm::vec3 light_dir = dir_light_.direction;
+		// RenderTexture(geomtry_pass_->texture_id(1), 320, 240);
+		// RenderTexture(terrain_->height_scale_, 100, 100, 500);
+		// RenderTexture(terrain_->texture_id_, 100, 100, 540);
+		// terrain_->RenderTerrain(camera_pos, view, projection);
+		// RenderTexture(terrain_->debug_->texture_id(0), 320, 240, 256);
 	}
 
 	// Swap
@@ -394,7 +411,12 @@ void Render::RenderGeometryPass(RenderWorld* world, Camera* camera) {
 
 	frustum_->Update(camera);
 
+	// Render Objects
 	Draw(world, gemotry, true);
+
+	// Render Terrain
+	if(terrain_) 
+		terrain_->RenderTerrainDeferred(camera_position, view, projection);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -432,6 +454,10 @@ void Render::Draw(RenderWorld* world, const Shader& shader, const bool cull) {
     while (world->has_next_robot()) {
         RenderBody* body = world->next_robot();
     // lxc end
+
+        if(!body)
+        	continue;
+
 		if(body->is_hiding())
 			continue;
 
@@ -449,12 +475,37 @@ void Render::Draw(RenderWorld* world, const Shader& shader, const bool cull) {
 			}
 
 			do_drawing(root, true);
+
 			// Parts
 			for (size_t j = 0; j < body->size(); ++j) {
 				if (body->render_part_ptr(j)) {
 					do_drawing(body->render_part_ptr(j), false);
 				}
 			}
+		}
+	}
+}
+
+// --------------------------------------------------------------------------------------------
+
+// Experimental
+void Render::RenderTerrainHeightMap(RenderWorld* world) {
+	if(world->has_terrain()) {
+		RenderTerrain* rt = world->get_terrain();
+
+		if(!terrain_) {
+			terrain_ = std::make_shared<Terrain>(rt->grid_size_,
+												 rt->terrain_size_);
+			if(profile_.visualize){
+				visualize_->InitDrawTerrain(terrain_);
+			}
+		}
+
+		if(rt->update_) {
+			terrain_->GenerateHeightMap(rt->terrain_data_);
+			rt->height_data_ = terrain_->GetHeightMapData();
+			rt->update_ = false;
+			rt->load_terrain_from_height_map();
 		}
 	}
 }
@@ -570,12 +621,13 @@ void Render::RenderShadowMaps(RenderWorld* world, Camera* camera) {
 	glCullFace(GL_FRONT);
 
 	auto pssm = shaders_[kPSSM];
-	pssm.use();
-
 	glm::mat4 projection = camera->GetProjectionMatrix();
 	glm::mat4 view = camera->GetViewMatrix();
+	glm::vec3 pos = camera->position_;
 
-	for (int i = 0; i < shadow_.csm.frustum_split_count(); ++i) {
+	// TODO: discard last cascade?
+	for (int i = 0; i < shadow_.csm.frustum_split_count() - 1; ++i) {
+		pssm.use();
 		pssm.setMat4("projection", projection);
 		pssm.setMat4("view", view);
 		pssm.setMat4("crop", shadow_.csm.split_view_proj(i));
@@ -587,6 +639,9 @@ void Render::RenderShadowMaps(RenderWorld* world, Camera* camera) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		Draw(world, pssm);
+
+		if(terrain_)
+			terrain_->RenderTerrainPSSM(pos, shadow_.csm.split_view_proj(i));
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}

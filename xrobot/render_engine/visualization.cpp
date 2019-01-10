@@ -123,6 +123,10 @@ void Visualization::DrawRootAABB(RenderWorld* world, const Shader& shader) {
     world->robot_iteration_begin();
     while (world->has_next_robot()) {
         RenderBody* body = world->next_robot();
+
+        if(!body)
+        	continue;
+        
 		RenderPart * part = body->render_root_ptr();
 		if (part && !body->is_recycled()) {
 			glm::vec3 aabb_min, aabb_max;
@@ -224,6 +228,10 @@ void Visualization::InitDrawBatchRays(const int rays) {
 	}
 }
 
+void Visualization::InitDrawTerrain(std::shared_ptr<Terrain> terrain) {
+	terrain_ = terrain;
+}
+
 void Visualization::Visualize(RenderWorld* world, Camera* camera, 
 		GLuint tex) {
 
@@ -233,6 +241,7 @@ void Visualization::Visualize(RenderWorld* world, Camera* camera,
 
 	glm::mat4 projection = free_camera_.GetProjectionMatrix();
 	glm::mat4 view = free_camera_.GetViewMatrix();
+	glm::vec3 camera_pos = free_camera_.position_;
 
 	Shader lambert = shaders_[kLambert];
 	Shader line = shaders_[kAABB];
@@ -253,6 +262,15 @@ void Visualization::Visualize(RenderWorld* world, Camera* camera,
 	lambert.setMat4("projection", projection);
 	lambert.setMat4("view", view);
 	Draw(world, lambert);
+
+	if(terrain_) {
+		terrain_->RenderTerrainForward(camera_pos, view, projection);
+
+		// glEnable(GL_LINE_SMOOTH);
+		// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		// terrain_->RenderTerrainForward(camera_pos, view, projection);
+		// glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 
 	glDisable( GL_POLYGON_OFFSET_FILL );
 
@@ -313,6 +331,10 @@ void Visualization::Draw(RenderWorld* world, const Shader& shader) {
    world->robot_iteration_begin();
     while (world->has_next_robot()) {
         RenderBody* body = world->next_robot();
+
+        if(!body)
+        	continue;
+        
 		if(body->is_hiding()) {
 			continue;
         }

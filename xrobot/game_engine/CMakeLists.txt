@@ -1,6 +1,7 @@
 add_library(game_engine OBJECT 
   map_grid.cpp
   map_suncg.cpp
+  map_terrain.cpp
   state_machine.cpp
   room_generator.cpp
   lidar.cpp

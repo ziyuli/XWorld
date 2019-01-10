@@ -12,6 +12,15 @@ static std::string r2d2       = "../data/r2d2/r2d2.urdf";
 static std::string husky      = "../data/husky/husky.urdf";
 static std::string husky_kuka = "../data/husky/robot_kuka.urdf";
 
+static std::string box_red    = "../data/box/red.urdf";
+static std::string box_green  = "../data/box/green.urdf";
+static std::string box_blue   = "../data/box/blue.urdf";
+static std::string box_yellow = "../data/box/yellow.urdf";
+static std::string box_cyan   = "../data/box/cyan.urdf";
+static std::string box_purple = "../data/box/purple.urdf";
+static std::string box_orange = "../data/box/orange.urdf";
+static std::string box_white  = "../data/box/white.urdf";
+
 static std::string test_wall   = "../data/wall/floor.urdf";
 static std::string test_floor  = "../data/floor/floor.urdf";
 

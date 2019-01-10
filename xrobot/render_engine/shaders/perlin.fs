@@ -5,9 +5,13 @@ precision highp float;
 out float FragColor;
 noperspective in vec2 TexCoords;
 
-uniform float offset = 0.0;
+uniform sampler2D height_scale_map;
+
+uniform float offset = -1.0;
 uniform float scale  = 8.0;
 uniform vec2  seed   = vec2(0);
+
+const ivec3 off = ivec3(-1,0,1);
 
 vec4 permute(vec4 x){ return mod(((x*34.0)+1.0)*x, 289.0); }
 
@@ -17,7 +21,7 @@ float rand(vec2 co){
 	return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 123.456);
 }
 
-float cnoise(vec2 P){
+float cnoise(vec2 P) {
 	vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
 	vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
 	Pi = mod(Pi, 289.0);
@@ -49,6 +53,17 @@ float cnoise(vec2 P){
 	return 2.3 * mix(n_x.x, n_x.y, fade_xy.y);
 }
 
+float heightscale(vec2 P) {
+	float h00 = texture(height_scale_map, P).x;
+	float h01 = textureOffset(height_scale_map, P, off.xy).x;
+    float h21 = textureOffset(height_scale_map, P, off.zy).x;
+    float h10 = textureOffset(height_scale_map, P, off.yx).x;
+    float h12 = textureOffset(height_scale_map, P, off.yz).x;
+    return mix(h00, mix(mix(h01, h10, 0.5), mix(h21, h12, 0.5), 0.5), 0.5);
+}
+
 void main() {
-	FragColor = max(offset, cnoise((TexCoords + rand(seed)) * scale));
+	float perlin = 0.5 * max(offset, cnoise((TexCoords + rand(seed)) * scale));
+	float height_scale = heightscale(TexCoords);
+	FragColor = perlin * height_scale;
 }
