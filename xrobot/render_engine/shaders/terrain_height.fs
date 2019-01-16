@@ -3,13 +3,14 @@
 precision highp float;
 
 out float FragColor;
+
 noperspective in vec2 TexCoords;
 
-uniform sampler2D height_scale_map;
-
-uniform float offset = -1.0;
-uniform float scale  = 8.0;
-uniform vec2  seed   = vec2(0);
+uniform sampler2D height_map;
+uniform vec3  height_clamp     = vec3(-1, 1, 0);
+uniform float perlin_high_freq = 0.02;
+uniform float perlin_low_freq  = 0.01;
+uniform vec2  seed             = vec2(0);
 
 const ivec3 off = ivec3(-1,0,1);
 
@@ -53,17 +54,26 @@ float cnoise(vec2 P) {
 	return 2.3 * mix(n_x.x, n_x.y, fade_xy.y);
 }
 
-float heightscale(vec2 P) {
-	float h00 = texture(height_scale_map, P).x;
-	float h01 = textureOffset(height_scale_map, P, off.xy).x;
-    float h21 = textureOffset(height_scale_map, P, off.zy).x;
-    float h10 = textureOffset(height_scale_map, P, off.yx).x;
-    float h12 = textureOffset(height_scale_map, P, off.yz).x;
+float perlin(float scale) {
+	float noise = cnoise((TexCoords + rand(seed)) * scale);
+	return clamp(noise, height_clamp.x, height_clamp.y);
+}
+
+float height(vec2 P) {
+	float h00 = texture(height_map, P).x;
+	float h01 = textureOffset(height_map, P, off.xy).x;
+    float h21 = textureOffset(height_map, P, off.zy).x;
+    float h10 = textureOffset(height_map, P, off.yx).x;
+    float h12 = textureOffset(height_map, P, off.yz).x;
     return mix(h00, mix(mix(h01, h10, 0.5), mix(h21, h12, 0.5), 0.5), 0.5);
 }
 
 void main() {
-	float perlin = 0.5 * max(offset, cnoise((TexCoords + rand(seed)) * scale));
-	float height_scale = heightscale(TexCoords);
-	FragColor = perlin * height_scale;
+	float perlin_low  = perlin(4.0f) * perlin_low_freq;
+	float perlin_high = perlin(12.0f) * perlin_high_freq;
+	float height_raw  = height(TexCoords);
+	if(height_clamp.z < 1)
+		FragColor = perlin_low + perlin_high + height_raw;
+	else
+		FragColor = (perlin_low + perlin_high) * height_raw;
 }

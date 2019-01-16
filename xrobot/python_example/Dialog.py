@@ -53,7 +53,7 @@ class XWorld3DDialog(XWorld3DTask):
 
 		self.agent = self.env.SpawnAnObject("husky/husky.urdf", [1,0,1], [-1,0,0,1.57], \
 			1.0, "Agent", True, False)
-		self.env.AttachCameraTo(self.agent, [0,1.7,0.0])
+		self.env.AttachCameraTo(self.agent, [0,1.0,0.0])
 		self.env.Initialize()
 		self.env.HighlightCenter(False)
 		self.env.DisplayInventory(False)
@@ -184,7 +184,7 @@ class XWorld3DDialog(XWorld3DTask):
 
 class XWorld3DEnv(object):
 	def __init__(self):
-		self.env = Playground(640, 480, HEADLESS, NORMAL, GPU0)
+		self.env = Playground(640, 480, HEADLESS, MED, GPU0)
 		self.task_group = TaskGroup("TaskGroup")
 		self.task_group.add_task("Dialog", XWorld3DDialog(self.env))
 		self.first = True

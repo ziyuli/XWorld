@@ -1,6 +1,8 @@
 #ifndef PLAYGROUND_PY_H_
 #define PLAYGROUND_PY_H_
 
+#define EXPERIMENTAL
+
 #include <memory>
 #include <vector>
 #include <functional>
@@ -10,7 +12,8 @@
 
 #include "render_engine/render.h"
 #include "map_grid.h"
-#include "map_suncg.h"
+#include "suncg.h"
+#include "terrain.h"
 #include "lidar.h"
 #include "task.h"
 #include "navigation.h"
@@ -19,8 +22,7 @@ using namespace xrobot;
 
 typedef render_engine::GLContext CTX;
 
-void list2vec(const boost::python::list& ns, std::vector<float>& v)
-{
+void list2vec(const boost::python::list& ns, std::vector<float>& v) {
 	int L = len(ns);
 	v.resize(L);
 	for (int i=0; i<L; ++i) {
@@ -28,18 +30,15 @@ void list2vec(const boost::python::list& ns, std::vector<float>& v)
 	}
 }
 
-inline boost::python::tuple vec2tuple(const glm::vec3 v)
-{
+inline boost::python::tuple vec2tuple(const glm::vec3 v) {
 	return boost::python::make_tuple(v.x, v.y, v.z);
 }
 
-inline boost::python::tuple vec2tuple(const glm::vec4 v)
-{
+inline boost::python::tuple vec2tuple(const glm::vec4 v) {
 	return boost::python::make_tuple(v.x, v.y, v.z, v.w);
 }
 
-inline glm::vec3 list2vec3(const boost::python::list& ns)
-{
+inline glm::vec3 list2vec3(const boost::python::list& ns) {
 	std::vector<float> ns_v;
 	list2vec(ns, ns_v);
 
@@ -47,8 +46,7 @@ inline glm::vec3 list2vec3(const boost::python::list& ns)
 	return glm::vec3(ns_v[0], ns_v[1], ns_v[2]);
 }
 
-inline glm::vec4 list2vec4(const boost::python::list& ns)
-{
+inline glm::vec4 list2vec4(const boost::python::list& ns) {
 	std::vector<float> ns_v;
 	list2vec(ns, ns_v);
 
@@ -56,8 +54,7 @@ inline glm::vec4 list2vec4(const boost::python::list& ns)
 	return glm::vec4(ns_v[0], ns_v[1], ns_v[2], ns_v[3]);
 }
 
-inline glm::quat list2quat(const boost::python::list& ns)
-{
+inline glm::quat list2quat(const boost::python::list& ns) {
 	std::vector<float> ns_v;
 	list2vec(ns, ns_v);
 
@@ -65,7 +62,8 @@ inline glm::quat list2quat(const boost::python::list& ns)
 	return glm::angleAxis(ns_v[3], glm::vec3(ns_v[0], ns_v[1], ns_v[2]));
 }
 
-// Range hold AABB struct
+// --------------------------------------------------------------------------------------------
+
 struct Range {
 	glm::vec3 min, max;
 
@@ -120,7 +118,8 @@ struct Range {
 	boost::python::tuple GetMax() const { return vec2tuple(max); }
 };
 
-// Thing hold object or robot in playground
+// --------------------------------------------------------------------------------------------
+
 class Thing {
 public:
 	Thing();
@@ -128,16 +127,11 @@ public:
 	// Returns current position in (x y z)
 	boost::python::tuple GetPosition();
 
-	// Return current orientation in (x y z w). It uses 
-	// normalized quaternion for orientation representation!
+	// Return current orientation in quaternion (x y z w). 
 	boost::python::tuple GetOrientation();
 
 	// Return the label
 	std::string GetLabel();
-
-	// Return properities
-	std::string GetProPerties() =delete;
-
 
 	long __hash__() { return (long) (uintptr_t) robot_.lock().get(); }
 	bool __eq__(const Thing& other) { 
@@ -149,7 +143,6 @@ public:
 	void SetPtr(std::weak_ptr<RobotBase> robot) { robot_ = robot; Sync(); }
 
 private:
-	//  Update all the status
 	bool Sync();
 	std::string label_;
 	boost::python::tuple position_;
@@ -157,18 +150,9 @@ private:
 	std::weak_ptr<RobotBase> robot_;
 };
 
-// class Agent : public Thing {
-// public:
-// 	Agent();
+// --------------------------------------------------------------------------------------------
+// Experimental
 
-// 	float GetYaw() const;
-// 	float GetPitch() const;
-
-// private:
-// 	std::shared_ptr<Playground> scene_;
-// };
-
-// NavAgent hold a object with navigation functionality
 class NavAgent {
 public:
 	explicit NavAgent(const int uid, const std::string& label);
@@ -179,81 +163,212 @@ public:
 	static std::string __str__(const NavAgent& self) { return self.label_; }
 
 private:
-	// Used to validate and access the agent in crowd. -1 means 
-	// this agent is invalid
 	int uid_;
 	std::string label_;
 };
 
+// --------------------------------------------------------------------------------------------
 // Playground defines the scene and renderer. Used to control the robot,
 // generate a scene, enable certain feature and query the object.
-//
-// If you are going to seek some special functionalities, 
-// such as IK, constraints, carving while path-finding, multi-rays lidar 
-// and high quality rendering this wrapper is not supported, use C++ instead.
 class Playground {
 public:
 
 	// Create a empty playground with basic rendering parameters.
-	// 
-	// If you are going to flyover visualization, use DEBUG_VISUALIZATION
-	// 
-	// Quality also can be adjust by switch RENDER_QUALITY_LOW and 
-	// RENDER_QUALITY_NORMAL. However, low quality rendering 
-	// does not have anti-aliasing which means images could have jagged edges.
-	Playground(const int w, const int h,
+	// Use VISUALIZATION to enable flyover camera.
+	Playground(const int w, 
+			   const int h,
 			   const int headless = 0, 
 			   const int quality = 0,
 			   const int device = 0); 
-
 	~Playground();
 
+	// Initialization
+	void Initialize();
 
-	void AssignTag(const std::string& path, const std::string& tag);
-	void LoadTag(const std::string& path);
-	void MakeObjectPickable(const std::string& tag);
-	boost::python::list GetGoals() const;
+	// Update
+	void Update();
+	void UpdateRenderer();
+	boost::python::dict UpdateSimulation();
+	boost::python::dict UpdateSimulationWithAction(const int action);
 
-	// Adjust directional light setting. Use python dict to update
-	// the configurations
-	//
-	// Example in Python:
-	// 	light_conf = dict()
-	//	light_conf["ambient"] = 0.1
-	// 	lifht_conf["exposure"] = 1.0
-	//  env.SetLighting(light_conf)
-	//
-	// Use key "direction_x", "direction_y", "direction_z" to update direction
-	// Use key "ambient" to update ambient factor
-	// Use key "exposure" to update exposure factor
+	// Reset
+	void Clear();
+	void ClearSpawnObjectsExceptAgent();
+
+	// Lighting
 	void SetLighting(const boost::python::dict lighting);
 
-	// Create a camera and attach it to a certain object in the scene
-	void AttachCameraTo(Thing object, const boost::python::list offset_py);
-	void UpdateAttachCamera(const float pitch);
+	// Camera
+	boost::python::tuple GetCameraPosition() const;
+	boost::python::tuple GetCameraFront() const;
+	boost::python::tuple GetCameraRight() const;
+	boost::python::tuple GetCameraUp() const;
+	float GetCameraYaw() const;
+	float GetNearClippingDistance();
+	float GetFarClippingDistance();
+	int GetWidth() const { return w_; }
+	int GetHeight() const { return h_; }
+	boost::python::object GetCameraRGBDRaw();
 
-	// Create a free camera
+	// Free camera
 	void FreeCamera(const boost::python::list position, const float yaw, const float pitch);
 	void UpdateFreeCamera(const boost::python::list position, const float yaw, const float pitch);
 
-	// Enable single ray lidar in the scene
-	// 
-	// A desired number of rays is less than 720
-	void EnableLidar(const int num_rays, const float max_distance);
+	// Attachable camera
+	void AttachCameraTo(Thing object, const boost::python::list offset_py);
+	void UpdateAttachCamera(const float pitch);
 
-	// Update lidar and return the results. -1 means no-hit
-	//
-	// Front, up vectors and attached position are necessary
+	// Single ray lidar
+	void EnableLidar(const int num_rays, const float max_distance);
 	boost::python::list UpdateLidar(const boost::python::list front_py, 
 								    const boost::python::list up_py,
 								    const boost::python::list position_py);
 
-	// Enable inventory for robot temporary storage. 
-	//
-	// This member function is nessecary for use "Pickup" and "Putdown" actions
+	// Inventory
 	void EnableInventory(const int max_capacity = 1);
-
 	void ClearInventory();
+	void MakeObjectPickable(const std::string& tag);
+
+	// Querying labels
+	void AssignTag(const std::string& path, const std::string& tag);
+	void LoadTag(const std::string& path);
+
+	// Control
+	void HoldActions(const bool hold);
+	void MoveForward(const float speed = 1);
+	void MoveBackward(const float speed = 1);
+	void TurnLeft(const float speed = 1);
+	void TurnRight(const float speed = 1);
+	void LookUp();
+	void LookDown();
+	std::string Grasp();
+	std::string PutDown();
+	void Attach();
+	void Detach();
+	std::string Rotate(const boost::python::list angle_py);
+	void Teleport(Thing object, 
+				  const boost::python::list position_py,
+				  const boost::python::list orientation_py);
+	void ControlJointPositions(const Thing& object, 
+					   		   const boost::python::dict joint_positions,
+					   		   const float max_force);
+	void ControlJointVelocities(const Thing& object, 
+					   		    const boost::python::dict joint_velocities,
+					   		    const float max_force);
+
+	// Interactions
+	boost::python::list EnableInteraction();
+	void DisableInteraction();
+	bool TakeAction(const int action_id);
+	boost::python::list OpenInventory();
+	void CloseInventory();
+	void Use(const int object_id);
+	bool UseObject(const int inventory_id);
+
+	// Event
+	boost::python::list QueryLastEvent();
+
+	// Query
+	bool QueryContact(Thing& object);
+	bool QueryObjectAABBIntersect(Thing& object_a, Thing& object_b);
+	bool QueryObjectWithLabelAtCameraCenter(const std::string& label);
+	bool QueryObjectWithLabelAtForward(const std::string& label);
+	bool QueryObjectWithLabelNearMe(const std::string& label);
+	Thing QueryObjectAtCameraCenter();
+	boost::python::list QueryObjectByLabel(const std::string& label);
+	boost::python::list QueryObjectNearObject(Thing& object, 
+											  const bool exlude = true, 
+											  const float dist = 2.0f);
+
+	// HUD
+	void HighlightCenter(const bool highlight);
+	void DisplayInventory(const bool display);
+
+	// Others
+	Thing GetAgent() const { return agent_; }
+	boost::python::dict GetStatus() const;
+	boost::python::dict GetActionSpace();
+	boost::python::dict GetObservationSpace();
+	boost::python::list GetGoals() const;
+
+
+	// --------------------------------------------------------------------------------------------
+	// Generate scene
+
+	// Generate a empty scene with checkerboard style floors and walls
+	void CreateArena(const int width = 5, const int length = 5);
+
+	// Generate a empty scene only for loading SUNCG houese
+	void CreateSceneFromSUNCG();
+
+	// Generate a random generated maze
+	void CreateRandomGenerateScene();
+
+	// Generate a empty scene
+	void CreateEmptyScene(const float min_x = -5, 
+						  const float max_x =  5,
+                          const float min_z = -5, 
+                          const float max_z =  5);
+
+	// --------------------------------------------------------------------------------------------
+	// The following methods only can be used in random generated maze or arena
+	
+	boost::python::list LocateObjectInGrid(Thing& object);
+	boost::python::list LocatePositionInGrid(const float x, const float z);
+	boost::python::list GetRoomVisitSequence();
+	boost::python::list GetRoomGroups();
+	boost::python::list GetSpaceNearPosition(const boost::python::list position,
+										     const float radius);
+	boost::python::list LoadSceneConfigure(const int w, 
+										   const int l, 
+										   const int n, 
+										   const int d);
+	void LoadBasicObjects(const boost::python::list doors,
+						  const boost::python::list keys,
+						  const boost::python::list key_tags,
+						  const std::string unlocked_door,
+						  const std::string& wall,
+						  const boost::python::list tiles);
+	void LoadModels(const boost::python::list models,
+					const boost::python::list tags);
+	void SpawnModelsConf(const boost::python::dict conf);
+	void SpawnModels();
+	void ResolvePath();
+
+	// --------------------------------------------------------------------------------------------
+	// The following methods only can be used in empty scene
+
+	void LoadXWorldScene(const std::string& filename);
+	boost::python::dict GetXWorldScene() const { return json_scene_; }
+
+	// --------------------------------------------------------------------------------------------
+	
+	// Load suncg house
+	void LoadSUNCG(const std::string& house,
+				   const std::string& metadata,
+				   const std::string& suncg_data_dir,
+				   const boost::python::list offset = boost::python::list(),
+				   const int filter = -1);
+
+	// --------------------------------------------------------------------------------------------
+	
+	// Populate an object
+	Thing SpawnAnObject(const std::string& file, 
+					    const boost::python::list position_py,
+					    const boost::python::list orentation_py,
+					    const float scale,
+					    const std::string& label,
+					    const bool fixed = true,
+					    const bool occupy = true);
+
+	// Remove an object
+	void RemoveAnObject(Thing& object);
+
+
+	// --------------------------------------------------------------------------------------------
+	// Experiental
+	// - Navigation Mesh
+	// - Terrain
 
 	// Enable navigations to use path-finding for a object or robot
 	//
@@ -290,8 +405,6 @@ public:
 
 
 	// Assign a target to an agent
-	//
-	// If an agent is no longer available, it will be neglected automatically
 	void AssignNavigationAgentTarget(const NavAgent& agent,
 		                             const boost::python::list position);
 
@@ -301,277 +414,34 @@ public:
 							      const boost::python::list position,
 							      const boost::python::list orientation);
 
-	// Clear everything in the scene, including the camera
-	void Clear();
-	void ClearSpawnObjectsExceptAgent();
 
+	// Generate a empty scene contains terrain
+	void CreateTerrain(const boost::python::list layers,
+					   const boost::python::list scales,
+					   const float height = 1.0f,
+					   const int terrain_size = 30,
+					   const int grid_size = 128);
+	void PaintPuddle(const boost::python::list position,
+					 const float scale,
+					 const float height,
+					 const int id = 0);
+	void PaintCircle(const boost::python::list position,
+					 const float scale,
+					 const float height,
+					 const int id = 0);
+	void PaintBox(const boost::python::list min_aabb,
+				  const boost::python::list max_aabb,
+				  const float height,
+				  const int id = 0);
+	void PaintCurve(const boost::python::list control_points,
+					const float scale,
+					const int prec = 32,
+					const int id = 0);
+	void LoadTerrain(const boost::python::list clamp,
+					 const boost::python::list noise);
 
-	// Generate a empty scene with checkerboard style floors and walls
-	//
-	// Default size is 5x5 (25m x 25m)
-	void CreateArena(const int width = 5, const int length = 5);
-
-	// Generate a empty SUNCG scene
-	void CreateSceneFromSUNCG();
-
-	// Generate a empty scene
-	void CreateEmptyScene(const float min_x = -5, const float max_x = 5,
-                          const float min_z = -5, const float max_z = 5);
-
-	// Generate a random size room
-	void CreateRandomGenerateScene();
-
-
-	void LoadXWorldScene(const std::string& filename);
-	boost::python::dict GetXWorldScene() const { return json_scene_; }
-
-	// Load a profile to generate random size room
-	//
-	// Example in Python:
-	//	conf = dict()
-	//	conf["room"] = [floor_path, wall_apth, door_path,...]
-	//	conf["on_floor"] = [crate_path, "crate_label",...]
-	//  conf["on_object"] = [crate_path, "crate_label",...]
-	//  env.LoadRandomSceneConfigure(conf)
-	//
-
-	boost::python::list LocateObjectInGrid(Thing& object);
-	boost::python::list LocatePositionInGrid(const float x, const float z);
-	boost::python::list GetRoomVisitSequence();
-	boost::python::list GetRoomGroups();
-	boost::python::list GetSpaceNearPosition(const boost::python::list position,
-										     const float radius);
-	boost::python::list LoadSceneConfigure(const int w, const int l, 
-										   const int n, const int d);
-	void LoadBasicObjects(const boost::python::list doors,
-						  const boost::python::list keys,
-						  const boost::python::list key_tags,
-						  const std::string unlocked_door,
-						  const std::string& wall,
-						  const boost::python::list tiles);
-	void LoadModels(const boost::python::list models,
-					const boost::python::list tags);
-	void SpawnModelsConf(const boost::python::dict conf);
-	void SpawnModels();
-
-	void ResolvePath();
-
-	// Load SUNCG
-	//
-	// "filter" means remove a certain type or some types object while 
-	// loading the scene
-	void LoadSUNCG(const std::string& house,
-				   const std::string& metadata,
-				   const std::string& suncg_data_dir,
-				   const int filter = -1);
-
-	// Generate object at position with orientation. It uses 
-	// normalized quaternion for orientation representation!
-	// 
-	// Only uniform scale is supported in Python
-	Thing SpawnAnObject(const std::string& file, 
-					    const boost::python::list position_py,
-					    const boost::python::list orentation_py,
-					    const float scale,
-					    const std::string& label,
-					    const bool fixed = true,
-					    const bool occupy = true);
-
-	void RemoveAnObject(Thing& object);
-
-	// Initialize camera
-	//
-	// Make sure call this member function before rendering loop
-	void Initialize();
-
-	void HoldActions(const bool hold);
-
-	// Update simulation and renderer
-	void Update();
-
-	// Update renderer 
-	//
-	// This also swap buffer in back
-	void UpdateRenderer();
-
-	// Update simulation Only
-	//
-	// This member function will not return any of available actions for 
-	// robot. To "UpdateSimulationWithAction" for actions return
-	boost::python::dict UpdateSimulation();
-
-	// Update simulation with action applied
-	//
-	// This member function will return the actions which available to robot
-	// in Python dict
-	//
-	// The number of actions are limited to 10! It cannot execute any action
-	// id are larger than 10
-	boost::python::dict UpdateSimulationWithAction(const int action);
-
-	// Get observation
-	//
-	// Velocities and Accelerations are not supported
-	boost::python::dict GetObservationSpace();
-
-	// Get actions
-	//
-	// Action ids are the continuous order numbers in the list
-	//
-	// Attach/Detach and Pickup/Putdown cannot use simultaneously.
-	boost::python::dict GetActionSpace();
-
-	// Get camera position and orientation
-	boost::python::tuple GetCameraPosition() const;
-	boost::python::tuple GetCameraFront() const;
-	boost::python::tuple GetCameraRight() const;
-	boost::python::tuple GetCameraUp() const;
-	float GetCameraYaw() const;
-
-	// Capture Size
-	int GetWidth() const { return w_; }
-	int GetHeight() const { return h_; }
-
-	// Get camera near clipping plane's distance
-	//
-	// Could be useful for calculating real depth
-	float GetNearClippingDistance();
-
-	// Get camera far clipping plane's distance
-	//
-	// Could be useful for calculating real depth
-	float GetFarClippingDistance();
-
-	// Get raw renderered images
-	//
-	// 8-bit unsigned char RGBA raw 
-	boost::python::object GetCameraRGBDRaw();
-
-	Thing GetAgent() const { return agent_; }
-
-	// Move the object or robot 
-	//
-	// The actual distance offset per step is 0.005 * speed
-	void MoveForward(const float speed = 1);
-	void MoveBackward(const float speed = 1);
+	// --------------------------------------------------------------------------------------------
 	
-	// Turn the object or robot
-	//
-	// The actual radius offset per step is 0.005 * speed
-	void TurnLeft(const float speed = 1);
-	void TurnRight(const float speed = 1);
-	
-	// Pitch up or down in 0.5 deg angle
-	//
-	// The angle will be clamped down in -45 to 45 deg 
-	void LookUp();
-	void LookDown();
-
-	// Pick up the object in the center of camera (also with in 3 unit length)
-	std::string Grasp();
-
-	// Put down the object in the center of camera (also with in 3 unit length)
-	std::string PutDown();
-
-	// Attach or stick the object root base at the center of camera (also with in 3 unit length)
-	void Attach();
-
-	// Detach the object which already been attached
-	void Detach();
-
-	// Rotate an object a certain degree angles
-	std::string Rotate(const boost::python::list angle_py);
-
-	// Teleport an object or robot to a certain position in scene
-	void Teleport(Thing object, const boost::python::list position_py,
-							    const boost::python::list orientation_py);
-
-	// Move or rotate the joint in certain position with maximum forces	
-	//
-	// "joint_position" should follow { joint_id : joint_position }
-	void ControlJointPositions(const Thing& object, 
-					   		   const boost::python::dict joint_positions,
-					   		   const float max_force);
-
-	// "joint_velocity" should follow { joint_id : joint_velocity }
-	void ControlJointVelocities(const Thing& object, 
-					   		    const boost::python::dict joint_velocities,
-					   		    const float max_force);
-
-	// Enable or disable the interaction for further actions
-	//
-	// Actions only can be executed after enable interaction
-	boost::python::list EnableInteraction();
-	void DisableInteraction();
-
-	// Take an action to a object with action id
-	//
-	// action id are limited from 0 to 3
-	bool TakeAction(const int action_id);
-
-	// Open / Close Inventory
-	// TODO
-	boost::python::list OpenInventory();
-	void CloseInventory();
-	void Use(const int object_id);
-
-	bool UseObject(const int inventory_id);
-
-	boost::python::list QueryLastEvent();
-
-	// Check Contact
-	bool QueryContact(Thing& object);
-
-	// Query two objects' (Bouding Box) are intersect
-	bool QueryObjectAABBIntersect(Thing& object_a, Thing& object_b);
-
-	// Query a certain object is at camera center
-	//
-	// This will use ray-cast to test ray intersection with object 
-	// concave or convex hull
-	bool QueryObjectWithLabelAtCameraCenter(const std::string& label);
-	bool QueryObjectsAtCameraCenter(boost::python::list objects) =delete;
-
-	// Query a certain object is at forward
-	//
-	// Only use distance and angle
-	bool QueryObjectWithLabelAtForward(const std::string& label);
-
-	// Query a certain object is near the robot
-	bool QueryObjectWithLabelNearMe(const std::string& label);
-
-	// Return object at camera center
-	Thing QueryObjectAtCameraCenter();
-
-	// Return a list contains all object with certain label
-	boost::python::list QueryObjectByLabel(const std::string& label);
-
-	boost::python::list QueryObjectNearObject(Thing& object, 
-		const bool exlude = true, const float dist = 2.0f);
-
-	// Get the framerate, rendered frames count and cache information
-	boost::python::dict GetStatus() const;
-
-	void HighlightCenter(const bool highlight);
-
-	void DisplayInventory(const bool display);
-
-
-	// Debug and Unfinished Member Functions
-	//
-	// You should not use any of this member functions
-	bool GetKeyPressUp() { return ctx_->GetKeyPressUp(); }
-	bool GetKeyPressDown() { return ctx_->GetKeyPressDown(); }
-	bool GetKeyPressRight() { return ctx_->GetKeyPressRight(); }
-	bool GetKeyPressLeft() { return ctx_->GetKeyPressLeft(); }
-	bool GetKeyPress1() { return ctx_->GetKeyPress1(); }
-	bool GetKeyPress2() { return ctx_->GetKeyPress2(); }
-	bool GetKeyPress3() { return ctx_->GetKeyPress3(); }
-	bool GetKeyPress4() { return ctx_->GetKeyPress4(); }
-	bool GetKeyPressKP9() { return ctx_->GetKeyPressKP9(); }
-	bool GetKeyPressKP6() { return ctx_->GetKeyPressKP6(); }
-	bool GameOver() const { return gameover_; }
-
 private:
 	int w_, h_;
 	int iterations_;
@@ -594,6 +464,8 @@ private:
 
 	std::vector<Thing> objects_;
 	std::shared_ptr<Map> scene_;
+	std::shared_ptr<Suncg> suncg_;
+	std::shared_ptr<Terrain> terrain_;
 	std::shared_ptr<Inventory> inventory_;
 	std::shared_ptr<Navigation> crowd_;
 	std::shared_ptr<Lidar> lidar_;
@@ -602,37 +474,53 @@ private:
 	render_engine::Camera * main_camera_;
 };
 
+// --------------------------------------------------------------------------------------------
 // Python Binding
 
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(CreateTerrain_member_overloads,
+									   Playground::CreateTerrain, 2, 5);
+
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(PaintPuddle_member_overloads,
+									   Playground::PaintPuddle, 3, 4);
+
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(PaintCircle_member_overloads,
+									   Playground::PaintCircle, 3, 4);
+
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(PaintBox_member_overloads,
+									   Playground::PaintBox, 3, 4);
+
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(PaintCurve_member_overloads,
+									   Playground::PaintCurve, 2, 4);
+
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(EnableInventory_member_overloads, 
-									   Playground::EnableInventory, 0, 1)
+									   Playground::EnableInventory, 0, 1);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(CreateEmptyScene_member_overloads, 
-									   Playground::CreateEmptyScene, 0, 4)
+									   Playground::CreateEmptyScene, 0, 4);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(LoadSUNCG_member_overloads, 
-									   Playground::LoadSUNCG, 3, 4)
+									   Playground::LoadSUNCG, 3, 5);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(SpawnAnObject_member_overloads, 
-									   Playground::SpawnAnObject, 5, 7)
+									   Playground::SpawnAnObject, 5, 7);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(MoveForward_member_overloads, 
-									   Playground::MoveForward, 0, 1)
+									   Playground::MoveForward, 0, 1);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(MoveBackward_member_overloads, 
-									   Playground::MoveBackward, 0, 1)
+									   Playground::MoveBackward, 0, 1);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(TurnLeft_member_overloads, 
-									   Playground::TurnLeft, 0, 1)
+									   Playground::TurnLeft, 0, 1);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(TurnRight_member_overloads, 
-									   Playground::TurnRight, 0, 1)
+									   Playground::TurnRight, 0, 1);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(QueryObjectNearObject_member_overloads, 
-									   Playground::QueryObjectNearObject, 1, 3)
+									   Playground::QueryObjectNearObject, 1, 3);
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(CreateArena_member_overloads, 
-									   Playground::CreateArena, 0, 2)
+									   Playground::CreateArena, 0, 2);
 
 BOOST_PYTHON_MODULE(libxrobot)
 {
@@ -670,7 +558,6 @@ BOOST_PYTHON_MODULE(libxrobot)
 			args("width", "length"), "dimension"
 		)
 	)
-
 	.def("EnableInventory", &Playground::EnableInventory,
 		EnableInventory_member_overloads(
 			args("max_capacity"), "capacity"
@@ -719,6 +606,36 @@ BOOST_PYTHON_MODULE(libxrobot)
 		)
 	)
 
+	.def("CreateTerrain", &Playground::CreateTerrain,
+		CreateTerrain_member_overloads(
+			args("height", "terrain_size", "grid_size"), "terrain"
+		)
+	)
+
+	.def("PaintPuddle", &Playground::PaintPuddle,
+		PaintPuddle_member_overloads(
+			args("layer_id"), "layer"
+		)
+	)
+
+	.def("PaintCircle", &Playground::PaintCircle,
+		PaintCircle_member_overloads(
+			args("layer_id"), "layer"
+		)
+	)
+
+	.def("PaintBox", &Playground::PaintBox,
+		PaintBox_member_overloads(
+			args("layer_id"), "layer"
+		)
+	)
+
+	.def("PaintCurve", &Playground::PaintCurve,
+		PaintPuddle_member_overloads(
+			args("prec", "layer_id"), "layer"
+		)
+	)
+	.def("LoadTerrain", &Playground::LoadTerrain)
 	.def("ClearSpawnObjectsExceptAgent", &Playground::ClearSpawnObjectsExceptAgent)
 	.def("HoldActions", &Playground::HoldActions)
 	.def("UpdateAttachCamera", &Playground::UpdateAttachCamera)
@@ -804,29 +721,35 @@ BOOST_PYTHON_MODULE(libxrobot)
 	scope().attr("NO_ACTION")           = 14;
 	scope().attr("HEADLESS")            = 1;
 	scope().attr("VISUALIZATION")       = 0;
-	scope().attr("DEBUG_VISUALIZATION") = 0;
+	scope().attr("HIDE")                = -1;
 	scope().attr("GRID")                = 0;
 	scope().attr("SUNCG")               = 1;
 	scope().attr("REMOVE_NONE")         = -1;
-	scope().attr("REMOVE_STAIR")        = 1;
-	scope().attr("REMOVE_DOOR")         = 2;
+	scope().attr("REMOVE_STAIR")        = 2;
+	scope().attr("REMOVE_DOOR")         = 1;
 	scope().attr("WORLD_UP")            = boost::python::make_tuple(0, 1, 0);
 	scope().attr("METACLASS_WALL")      = std::string("Wall");
 	scope().attr("METACLASS_FLOOR")     = std::string("Floor");
 	scope().attr("METACLASS_CEILING")   = std::string("Ceiling");
-	scope().attr("VERY_LOW")                 = 0;
-	scope().attr("LOW")                      = 1;
-	scope().attr("NORMAL_NO_SHADOW")         = 2;
-	scope().attr("NORMAL")                   = 3;
-	scope().attr("HIGH")                     = 4;
-	scope().attr("FLAT")                     = 0;
-	scope().attr("BLINN")                    = 1;
-	scope().attr("BLINN_AO_AA")              = 2;
-	scope().attr("BLINN_SHADOW_AO_R_AA")     = 3;
-	scope().attr("VCT_SHADOW_AO_R_AA")       = 4;
-	scope().attr("GPU0")                     = 0;
-	scope().attr("GPU1")                     = 1;
-	scope().attr("GPU2")                     = 2;
-	scope().attr("GPU3")                     = 3;
+	scope().attr("VERY_LOW")            = (int) render_engine::kVeryLow;
+	scope().attr("LOW")                 = (int) render_engine::kLow;
+	scope().attr("NORMAL")              = (int) render_engine::kNormal;
+	scope().attr("MED")                 = (int) render_engine::kMed;
+	scope().attr("HIGH")                = (int) render_engine::kHigh;
+	scope().attr("EXTREME")             = (int) render_engine::kExtreme;
+	scope().attr("SHADING")             = (int) render_engine::kShading;
+	scope().attr("SHADOW")              = (int) render_engine::kShadow;
+	scope().attr("AO")     	            = (int) render_engine::kAO;
+	scope().attr("SSR")       			= (int) render_engine::kSR;
+	scope().attr("VCT")                 = (int) render_engine::kVCT;
+	scope().attr("AA")                  = (int) render_engine::kAA;
+	scope().attr("GPU0")                = 0;
+	scope().attr("GPU1")                = 1;
+	scope().attr("GPU2")                = 2;
+	scope().attr("GPU3")                = 3;
+	scope().attr("GPU4")                = 4;
+	scope().attr("GPU5")                = 5;
+	scope().attr("GPU6")                = 6;
+	scope().attr("GPU7")                = 7;
 }
 #endif // PLAYGROUND_PY_H_

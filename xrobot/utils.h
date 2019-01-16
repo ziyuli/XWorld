@@ -65,7 +65,7 @@ template<typename T>
 std::shared_ptr<T> wptr_to_sptr(
         const std::weak_ptr<T>& wptr, bool can_be_null = false) {
     std::shared_ptr<T> sptr = wptr.lock();
-    assert(can_be_null || sptr);
+    // assert(can_be_null || sptr);
     return sptr;
 }
 

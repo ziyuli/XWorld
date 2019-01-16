@@ -12,7 +12,6 @@ namespace xrobot {
 class Lidar {
 public:
     Lidar(World* world, const int number_of_rays, const float max_distance);
-
     ~Lidar();
 
     void Update(
@@ -21,7 +20,6 @@ public:
             const glm::vec3& center);
 
     std::vector<RayTestInfo> GetResult() const;
-
     int GetNumRays() const { return num_rays_; }
     int GetMaxDistance() const { return max_distance_; }
 

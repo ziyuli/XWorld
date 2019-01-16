@@ -18,53 +18,39 @@
 namespace xrobot {
 namespace render_engine {
 
-struct Profile {
-    bool shading;
-    bool shadow;
-    bool ao;
-    bool ssr;
-    bool vct;
-    bool fxaa;
-    bool visualize;
-    bool multirays;
+enum kRenderFeatures {
+    kNone = 0,
+    kShading = 1,
+    kShadow = 2,
+    kAO = 4,
+    kSR = 8,
+    kVCT = 16,
+    kAA = 32,
+    kVisualization = 64,
+    kDepthCapture = 128
 };
 
+constexpr int kDefaultConf = kShading | kVisualization;
+constexpr int kVeryLow = kNone;
+constexpr int kLow = kShading;
+constexpr int kNormal = kShading | kAO | kAA;
+constexpr int kMed = kShading | kAO | kAA | kShadow;
+constexpr int kHigh = kShading | kAO | kAA | kShadow | kSR;
+constexpr int kExtreme = kShading | kAO | kAA | kShadow | kSR | kVCT;
+constexpr int kVeryLowVisualize = kVeryLow | kVisualization;
+constexpr int kLowVisualize = kLow | kVisualization;
+constexpr int kNormalVisualize = kNormal | kVisualization;
+constexpr int kMedVisualize = kMed | kVisualization;
+constexpr int kHighVisualize = kHigh | kVisualization;
+constexpr int kExtremeVisualize = kExtreme | kVisualization;
 constexpr int kLidarCaptureRes = 64;
 
-const struct Profile kVeryLowQuality = {
-        false, false, false, false, false, false, false, false};
-
-const struct Profile kLowQuality = {
-        true, false, false, false, false, false, false, false};
-
-const struct Profile kNormalQualityNS = {
-        true, false, true, true, false, true, false, false};
-
-const struct Profile kNormalQuality = {
-        true, true, true, true, false, true, false, false};
-
-const struct Profile kHighQuality = {
-        true, true, true, false, true, true, false, false};
-
-const struct Profile kVeryLowQualityVisualize = {
-        false, false, false, false, false, false, true, false};
-
-const struct Profile kLowQualityVisualize  = {
-        true, false, false, false, false, false, true, false};
-
-const struct Profile kNormalQualityNSVisualize = {
-        true, false, true, true, false, true, false, false};
-
-const struct Profile kNormalQualityVisualize  = {
-        true, true, true, false, false, true, true, false};
-
-const struct Profile kHighQualityVisualize  = {
-        true, true, true, false, true, true, true, false};
-
-const Profile profiles[10] = {
-        kVeryLowQuality, kLowQuality, kNormalQualityNS, kNormalQuality, kHighQuality,
-        kVeryLowQualityVisualize, kLowQualityVisualize, kNormalQualityNSVisualize,
-        kNormalQualityVisualize, kHighQualityVisualize};
+const int profiles[6] = {kVeryLow,
+                         kLow,
+                         kNormal,
+                         kMed,
+                         kHigh,
+                         kExtreme};
 
 struct Lighting {
     float exposure = 0.5f;
@@ -75,7 +61,7 @@ struct DirectionalLight {
     glm::vec3 direction = glm::vec3(1, 2, 1);
     glm::vec3 diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     glm::vec3 specular = glm::vec3(0.5f, 0.5f, 0.5f);
-    glm::vec3 ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+    glm::vec3 ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 };
 
 struct PSSM {

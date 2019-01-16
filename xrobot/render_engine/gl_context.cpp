@@ -457,7 +457,7 @@ void GLFWContext::MouseCallback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 
-GLFWContext::GLFWContext(int h, int w, bool core) :
+GLFWContext::GLFWContext(int h, int w, bool hide, bool core) :
         GLContext{h, w},window_(nullptr) {
     glfwInit();
     // Set all the required options for GLFW
@@ -468,8 +468,12 @@ GLFWContext::GLFWContext(int h, int w, bool core) :
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, false);
         // glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
-        // glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
     }
+
+    if (hide) {
+        glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+    }
+
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     
     const bool isFullScreen = false;

@@ -17,6 +17,7 @@ Examples
 # Experiment
 
 - `Interactive.sh`: Interactive edit static scene 
+- `Outdoor.sh`: Outdoor scene
 
 # Demo
 

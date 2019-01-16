@@ -13,7 +13,7 @@
 
 #include "game_engine/task.h"
 #include "game_engine/state_machine.h"
-#include "test_terrain.h"
+#include "navigation_on_terrain.h"
 
 using namespace xrobot;
 
@@ -24,11 +24,13 @@ int main(int argc, char **argv)
 {
     assert(argc < 3);
 
-    render_engine::Profile profile = render_engine::kVeryLowQualityVisualize;
-    if(argc == 2 && atoi(argv[1]) < 5) 
+    int profile = render_engine::kLow;
+    if(argc == 2 && atoi(argv[1]) < 6) 
         profile = render_engine::profiles[atoi(argv[1])];
 
-    std::shared_ptr<MapTerrain> scene = std::make_shared<MapTerrain>();
+    profile |= render_engine::kVisualization;
+
+    std::shared_ptr<Map> scene = std::make_shared<Map>();
     std::shared_ptr<render_engine::Render> renderer = 
             std::make_shared<render_engine::Render> (w, h, profile, false);
     

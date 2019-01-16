@@ -6,19 +6,20 @@ namespace xrobot {
 using namespace render_engine;
 using namespace bullet_engine;
 
-Terrain::Terrain(const WorldWPtr& bullet_world) : BulletTerrain(),
-                                                  bullet_world_(bullet_world),
-                                                  data_(NULL),
-                                                  collision_shape_(false) {}
+TerrainWorld::TerrainWorld(
+        const WorldWPtr& bullet_world) : BulletTerrain(),
+                                         bullet_world_(bullet_world),
+                                         data_(NULL),
+                                         collision_shape_(false) {}
 
-Terrain::~Terrain() {
+TerrainWorld::~TerrainWorld() {
     if(data_) {
         free(data_);
         data_ = NULL;
     }
 }
 
-void Terrain::load_terrain_from_height_map() {
+void TerrainWorld::load_terrain_from_height_map() {
     float* data = height_data_.data();
     int grid_size_1 = grid_size_ + 1;
     int grid_count  = grid_size_1 * grid_size_1;
@@ -50,10 +51,11 @@ void Terrain::load_terrain_from_height_map() {
     collision_shape_ = true;
 }
 
-void Terrain::RemoveTerrainFromBullet() {
+void TerrainWorld::RemoveTerrainFromBullet() {
     if(collision_shape_) {
         auto bullet_world = wptr_to_sptr(bullet_world_);
-        remove_from_bullet(bullet_world->client_);
+        if(bullet_world)
+            remove_from_bullet(bullet_world->client_);
     }
 }
 
@@ -233,14 +235,20 @@ std::weak_ptr<RobotBase> World::LoadRobot(
 }
 
 void World::GenerateTerrain(const int grid_size, const int terrain_size,
-        TerrainDatas_t* terrain_data) {
+        const glm::vec2 noise, const glm::vec3 clamp, const glm::vec2 seed,
+        TerrainDatas_t* terrain_data, TerrainLayers_t* terrain_layer) {
     if(!terrain_) {
-        terrain_ = std::make_shared<Terrain>(shared_from_this());
-        terrain_->grid_size_ = grid_size;
-        terrain_->terrain_size_ = terrain_size;
-        terrain_->terrain_data_ = terrain_data;
-        terrain_->update_ = true;
+        terrain_ = std::make_shared<TerrainWorld>(shared_from_this());
     }
+
+    terrain_->grid_size_ = grid_size;
+    terrain_->seed_ = seed;
+    terrain_->clamp_ = clamp;
+    terrain_->noise_scale_ = noise;
+    terrain_->terrain_size_ = terrain_size;
+    terrain_->terrain_data_ = terrain_data;
+    terrain_->terrain_layers_ = terrain_layer;
+    terrain_->update_ = true;
 }
 
 std::weak_ptr<RobotBase> World::LoadRobot(

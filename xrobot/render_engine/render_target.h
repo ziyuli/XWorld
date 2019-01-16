@@ -30,6 +30,7 @@ public:
 	void append_rgba_float16_bilinear();
 	void append_rgb_float32();
 	void append_rgb_float16();
+	void append_rgb_float16_bilinear();
 	void append_rgb_uint8();
 	void append_rgb_float();
 	void append_rgb_float_bilinear();

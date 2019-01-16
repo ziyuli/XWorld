@@ -105,7 +105,7 @@ set_target_properties(xrobot
 if(BUILD_CPP_EXAMPLES)
   # Navigation in Maze
   add_executable(xrobot_test_nav
-    cpp_example/example_navigation_in_maze.cpp
+    cpp_example/example_maze.cpp
     cpp_example/navigation_in_maze.cpp)
   add_dependencies(xrobot_test_nav xrobot)
   target_link_libraries(xrobot_test_nav PUBLIC xrobot ${DEP_LIBS})
@@ -115,7 +115,7 @@ if(BUILD_CPP_EXAMPLES)
 
   # Navigation in SUNCG
   add_executable(xrobot_test_suncg
-    cpp_example/example_navigation_in_suncg.cpp
+    cpp_example/example_suncg.cpp
     cpp_example/navigation_in_suncg.cpp)
   add_dependencies(xrobot_test_nav xrobot)
   target_link_libraries(xrobot_test_suncg PUBLIC xrobot ${DEP_LIBS})
@@ -125,8 +125,8 @@ if(BUILD_CPP_EXAMPLES)
 
   # Terrain 
   add_executable(xrobot_test_terrain
-    cpp_example/example_test_terrain.cpp
-    cpp_example/test_terrain.cpp)
+    cpp_example/example_terrain.cpp
+    cpp_example/navigation_on_terrain.cpp)
   add_dependencies(xrobot_test_nav xrobot)
   target_link_libraries(xrobot_test_terrain PUBLIC xrobot ${DEP_LIBS})
   target_include_directories(xrobot_test_terrain PUBLIC ${DEP_INCLUDES})

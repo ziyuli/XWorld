@@ -4,20 +4,23 @@ namespace xrobot
 {
 	Task_SUNCG::Task_SUNCG(
 		std::shared_ptr<render_engine::Render> renderer,
-		std::shared_ptr<MapSuncg> map) : iterations_(0),
-								        scene_(map),
-								        agent_(),
-								        lidar_(nullptr),
-								        inventory_(nullptr),
-								        renderer_(renderer),
-								        ctx_(renderer->GetContext()),
-								        main_camera_(nullptr),
-								        cam_pitch_(0) {
-		// Initialize Inventory and Lidar
-		inventory_= std::make_shared<Inventory>(1);
-		lidar_ = std::make_shared<Lidar>(map->world_.get(), 90, 4.0f);
+		std::shared_ptr<Map> map) : iterations_(0),
+								    scene_(map),
+								    agent_(),
+								    lidar_(nullptr),
+								    inventory_(nullptr),
+								    renderer_(renderer),
+								    ctx_(renderer->GetContext()),
+								    main_camera_(nullptr),
+								    cam_pitch_(0) {
+		// Initialize Suncg Loader
+		suncg_ = std::make_shared<Suncg>(map->world_);
 
-		// Init Visualization for Lidar
+		// Initialize Inventory
+		inventory_= std::make_shared<Inventory>(1);
+
+		// Initialize Lidar
+		lidar_ = std::make_shared<Lidar>(map->world_.get(), 90, 4.0f);
 		renderer->InitDrawBatchRays(90);
 	}
 
@@ -34,6 +37,7 @@ namespace xrobot
 
         // Reset
         iterations_ = 0;
+        suncg_->Reset();
 		scene_->ResetMap();
 
 		// Reset Joint Pose
@@ -47,25 +51,25 @@ namespace xrobot
 	    pos_7_ = 0.0f;
 
 		// Load Assets and Scene
-		scene_->SetRemoveAll( kRemoveStairs );
-        scene_->LoadCategoryCSV(suncg_meta.c_str());
+		suncg_->SetRemoveAll( kRemoveStairs );
+        suncg_->LoadCategoryCSV(suncg_meta.c_str());
         scene_->world_->UpdatePickableList("kettle", true);
 	    scene_->world_->UpdatePickableList("knife_rack", true);
 	    scene_->world_->UpdatePickableList("coffee_machine", true);
-        scene_->AddPhysicalProperties("chair", {100, false});
-	    scene_->AddPhysicalProperties("fruit_bowl", {100, false});
-	    scene_->AddPhysicalProperties("trash_can", {100, false});
-	    scene_->AddPhysicalProperties("coffee_machine", {100, false});
-	    scene_->AddPhysicalProperties("knife_rack", {100, false});
-	    scene_->AddPhysicalProperties("knife", {10, false});
-	    scene_->AddPhysicalProperties("kettle", {100, false});
-	    scene_->LoadJSON(suncg_house.c_str(), suncg_dir.c_str(), true);
-	    scene_->SetMapSize(-8, -8, 6, 6);
-
+        suncg_->AddPhysicalProperties("chair", {100, false});
+	    suncg_->AddPhysicalProperties("fruit_bowl", {100, false});
+	    suncg_->AddPhysicalProperties("trash_can", {100, false});
+	    suncg_->AddPhysicalProperties("coffee_machine", {100, false});
+	    suncg_->AddPhysicalProperties("knife_rack", {100, false});
+	    suncg_->AddPhysicalProperties("knife", {10, false});
+	    suncg_->AddPhysicalProperties("kettle", {100, false});
+	    suncg_->LoadJSON(suncg_house.c_str(), suncg_dir.c_str(), true);
+	    scene_->world_->set_world_size(-8, -8, 6, 6);
+	    
 		// Spawn Agent
 	   	agent_ = scene_->world_->LoadRobot(
 	        husky_kuka,
-	        glm::vec3(-6,0.21,-1),
+	        glm::vec3(-6,0.17,-1),
 	        glm::vec3(-1,0,0),
             1.57,
 	        glm::vec3(0.6f, 0.6f, 0.6f),

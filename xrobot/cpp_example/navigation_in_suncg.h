@@ -8,7 +8,7 @@
 #include "render_engine/render.h"
 
 #include "game_engine/lidar.h"
-#include "game_engine/map_suncg.h"
+#include "game_engine/suncg.h"
 #include "game_engine/navigation.h"
 #include "game_engine/state_machine.h"
 #include "game_engine/task.h"
@@ -25,7 +25,7 @@ namespace xrobot
 	public:
 
 		Task_SUNCG(std::shared_ptr<render_engine::Render> renderer,
-				   std::shared_ptr<MapSuncg> map);
+				   std::shared_ptr<Map> map);
 		~Task_SUNCG();
 
 		std::string Start();
@@ -35,11 +35,12 @@ namespace xrobot
 		int iterations_;
 		float cam_pitch_;
 
+		std::shared_ptr<Suncg> suncg_;
 		std::shared_ptr<Inventory> inventory_;
 		std::shared_ptr<Lidar> lidar_;
 		std::weak_ptr<RobotBase> agent_;
 		std::weak_ptr<RobotBase> obj_conv_;
-		std::shared_ptr<MapSuncg> scene_;
+		std::shared_ptr<Map> scene_;
 		std::shared_ptr<render_engine::Render> renderer_;
 
 		render_engine::GLContext * ctx_;

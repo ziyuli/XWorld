@@ -1223,14 +1223,14 @@ glm::vec3 MapGrid::GenerateLayout(const int w, const int l, const int n, const i
 }
 
 // Clear
-
 void MapGrid::ResetMap() {
 
-	if(world_->reset_count_ % 1000) {
-		world_->CleanEverything2();
-	} else {
-		world_->CleanEverything();
-	}
+	if(world_) {
+        if(world_->reset_count_ % 1000)
+            world_->CleanEverything2();
+        else
+            world_->CleanEverything();
+    }
 
 	printf("[World] Reset %d\n", world_->reset_count_);
 

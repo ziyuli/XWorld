@@ -1,7 +1,6 @@
 add_library(game_engine OBJECT 
   map_grid.cpp
-  map_suncg.cpp
-  map_terrain.cpp
+  terrain.cpp
   state_machine.cpp
   room_generator.cpp
   lidar.cpp
@@ -9,6 +8,7 @@ add_library(game_engine OBJECT
   inventory.cpp
   world.cpp
   robot.cpp
+  suncg.cpp
   python_binding.cpp)
 
 add_dependencies(game_engine render_engine bullet_engine)

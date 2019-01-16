@@ -104,12 +104,12 @@ void SSAO::BlurPass(const GLuint g_position) {
 
 void SSAO::GenerateNoise1DTexture() {
 	std::vector<glm::vec3> ssaoNoise;
-	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0);
+	std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
 	std::default_random_engine generator;
 	for (unsigned int i = 0; i < 16; i++) {
 		glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0,
 						randomFloats(generator) * 2.0 - 1.0,
-						0.0f);
+						0.0);
 		ssaoNoise.push_back(noise);
 	}
 
@@ -125,12 +125,12 @@ void SSAO::GenerateNoise1DTexture() {
 }
 
 void SSAO::GenerateSSAOKernel() {
-	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0);
+	std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
 	std::default_random_engine generator;
 	for (unsigned int i = 0; i < 64; ++i) {
 		glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0,
 						 randomFloats(generator) * 2.0 - 1.0,
-						 randomFloats(generator));
+						 randomFloats(generator) + 0.001);
 		sample = glm::normalize(sample);
 		sample *= randomFloats(generator);
 		float scale = float(i) / 64.0;

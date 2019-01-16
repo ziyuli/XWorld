@@ -146,8 +146,7 @@ void Capture::RenderCubemap(RenderWorld* world, Camera* camera) {
 
 	glm::vec3 eye = camera->position_;
 	glm::vec3 front = camera->front_;
-	glm::vec3 up = camera->up_;
-
+	glm::vec3 up = camera->world_up_;
 
 	glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f),
 			1.0f, 0.02f, 20.0f);

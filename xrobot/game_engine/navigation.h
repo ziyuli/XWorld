@@ -140,7 +140,6 @@ private:
     Grid grid_map_;
     PathRequest current_request_;
     std::queue<PathRequest> requests_;
-    //std::vector<std::thread> workers_;
 };
 
 class Navigation {

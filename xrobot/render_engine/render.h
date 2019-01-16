@@ -25,7 +25,7 @@
 #include "capture.h"
 #include "visualization.h"
 #include "render_world.h"
-#include "terrain.h"
+#include "terrain_shape.h"
 
 namespace xrobot {
 namespace render_engine {
@@ -44,8 +44,8 @@ class Render {
 public:
     Render(const int width,
            const int height,
-           const Profile profile,
-           const bool headless = false,
+           const int conf,
+           const int headless = 1,
            const int device = 0);
 
     ~Render();
@@ -131,7 +131,7 @@ private:
     void CheckVersion();
 
     // Basic
-    Profile profile_;
+    int conf_;
     Lighting lighting_;
 
     GLContext * ctx_;
@@ -168,10 +168,10 @@ private:
 
     // Visualization
     std::shared_ptr<Visualization> visualize_;
-    std::shared_ptr<Capture> capture_;
-
+    
     // Experimental
-    std::shared_ptr<Terrain> terrain_;
+    std::shared_ptr<Capture> capture_;
+    std::shared_ptr<TerrainShape> terrain_;
 };
 
 }

@@ -228,7 +228,7 @@ void Visualization::InitDrawBatchRays(const int rays) {
 	}
 }
 
-void Visualization::InitDrawTerrain(std::shared_ptr<Terrain> terrain) {
+void Visualization::InitDrawTerrain(std::shared_ptr<TerrainShape> terrain) {
 	terrain_ = terrain;
 }
 

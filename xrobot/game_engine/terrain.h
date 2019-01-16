@@ -1,5 +1,5 @@
-#ifndef MAP_TERRAIN_H_
-#define MAP_TERRAIN_H_
+#ifndef TERRAIN_H_
+#define TERRAIN_H_
 
 #include "map.h"
 #include <random>
@@ -8,16 +8,15 @@ using namespace glm;
 
 namespace xrobot
 {
-	class MapTerrain : public Map
+	class Terrain
 	{
 	public:
-		MapTerrain();
-		~MapTerrain();
+		Terrain(std::shared_ptr<World> world);
+		~Terrain();
 
 		void GeneratePath(const std::vector<glm::vec3> control_points,
-						  const int num_points, const float& scale,
+						  const int prec, const float& scale,
 						  const unsigned int id);
-
 		void GeneratePuddle(const glm::vec2& position, const float& scale, 
 				const float height, const unsigned int id);
 		void GenerateCircle(const glm::vec2& position, const float& radius, 
@@ -25,9 +24,13 @@ namespace xrobot
 		void GenerateBox(const glm::vec2& aabb_min, const glm::vec2& aabb_max, 
 				const float height, const unsigned int id);
 
-		void LoadTerrain();
-		void GenerateTerrain(const int terrain_size, const int grid_size);
-		void ResetMap();
+		void AddTerrainLayer(const std::string& path, const float scale = 1.0f);
+		void LoadTerrain(const glm::vec3 clamp = glm::vec3(-1.0f, 1.0f, 1.0f), 
+						 const glm::vec2 noise = glm::vec2(0.05f, 0.15f));
+		void GenerateTerrain(const int terrain_size,
+							 const int grid_size,
+							 const float height = 0.0f);
+		void Reset();
 
 	private:
 
@@ -35,7 +38,10 @@ namespace xrobot
 		int terrain_size_;
 		glm::vec2 scale_;
 		std::mt19937 mt_;
-		std::vector<TerrainData> terrain_;
+		std::vector<TerrainData> terrain_data_;
+		std::vector<TerrainLayer> terrain_layers_;
+
+		std::weak_ptr<World> world_;
 
 		inline float random(const float a, const float b) {
 			std::uniform_real_distribution<float> rnd(a, b);
@@ -60,5 +66,5 @@ namespace xrobot
 	};
 }
 
-#endif // MAP_TERRAIN_H_
+#endif // TERRAIN_H_
 

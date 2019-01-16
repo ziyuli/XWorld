@@ -118,7 +118,7 @@ class XWorld3DNavTargetInMaze(XWorld3DTask):
 
 class XWorld3DEnv(object):
 	def __init__(self):
-		self.env = Playground(640, 480, HEADLESS, NORMAL, GPU0)
+		self.env = Playground(640, 480, HEADLESS, MED, GPU0)
 		self.task_group = TaskGroup("TaskGroup")
 		self.task_group.add_task("NavTargetMaze", XWorld3DNavTargetInMaze(self.env))
 		self.first = True
@@ -162,7 +162,7 @@ def main():
 		action = NO_ACTION
 
 		# action inputs from keyboard
-		key = cv2.waitKey(0)
+		key = cv2.waitKey(1)
 		if key == 119:   # W
 			action = 0
 		elif key == 97:  # A

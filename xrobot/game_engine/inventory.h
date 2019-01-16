@@ -14,16 +14,13 @@ class Inventory {
     using RobotBaseWPtr = std::weak_ptr<RobotBase>;
 public:
 	Inventory(const int size);
-
 	~Inventory();
 
 	bool PutObject(const RobotBaseWPtr& put_object);
+	bool DiscardObject(const std::string& object_label);
 
 	RobotBaseWPtr GetObjectLast();
-
 	std::vector<std::string> GetObjectTagInInventory();
-
-	bool DiscardObject(const std::string& object_label);
 
 	void ClearInventory();
 	void PrintInventory();

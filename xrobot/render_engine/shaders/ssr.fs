@@ -43,15 +43,16 @@ void main()
     float error = coords.w;
     float screenEdgefactor = clamp(1.0 - (dCoords.x + dCoords.y), 0.0, 1.0);
     
+    float f = (1.0 - rough) * 0.5;
     vec3 color = textureLod(renderedTexture, coords.xy, rough * 3.5f).rgb;
-    vec3 ssr = color * clamp(screenEdgefactor, 0.0, 1.0);
+    vec3 ssr = color * clamp(screenEdgefactor, 0.0, 1.0) * f;
     
     error *= clamp(screenEdgefactor, 0.0, 0.9);
     
     float backfacingFactor = 1.0 - smoothstep(-1.0, -0.8, R.z);
     ssr *= backfacingFactor;
     error *= backfacingFactor;
-    FragColor = (1.0 - rough) * 0.5f * mix(ssr, vec3(0), max(1.0 - error, 0.0));
+    FragColor = mix(ssr, vec3(0), max(1.0 - error, 0.0));
 }
  
 vec3 binarySearch(inout vec3 dir, inout vec3 hitCoord, inout float dDepth)

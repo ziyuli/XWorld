@@ -17,26 +17,27 @@ namespace render_engine {
 
 enum TerrainShaders{
 	kBlit,
-	kBoxBlur,
-	kPerlin,
-	kLighting,
+	kUpRes,
+	kTerrainHeight,
+	kTerrainNormal,
+	kTerrainBlend,
 	kTerrainDeferred,
 	kTerrainForward,
 	kTerrainShadow,
 	kTerrainShaders
 };
 
-class Terrain {
+class TerrainShape {
 public:
-	Terrain(const int grid_size, const int terrain_size);
-	~Terrain();
+	TerrainShape(const int grid_size, const int terrain_size);
+	~TerrainShape();
+	void Reset();
 
-	void LoadTerrainTextures(const std::vector<std::string> albedo,
-							 const std::vector<std::string> normal);
-
-	void GenerateTextureID();
-
-	void GenerateHeightMap(TerrainDatas_t* terrain_data);
+	void LoadTerrainTextures(TerrainLayers_t* layers);
+	void LoadTerrainData(TerrainDatas_t* terrain_data);
+	void LoadTerrainParameters(const glm::vec2 ns,
+							   const glm::vec3 clp,
+							   const glm::vec2 seed);
 
 	void RenderTerrainForward(const glm::vec3 camera,
 					          const glm::mat4 view,
@@ -54,9 +55,10 @@ public:
 private:
 	void InitShaders();
 	void RenderQuad();
-	void GenerateAuxMaps(TerrainDatas_t* terrain_data);
-	void GenerateHeight();
+	void TerrainDataToTextures(TerrainDatas_t* terrain_data);
+	void GenerateHeightMap();
 	void GenerateNormalMap();
+	void GenerateBlendMap();
 	void RenderTerrain(Shader& shader,
 					   const glm::vec3 camera,
 					   const glm::mat4 view,
@@ -64,21 +66,27 @@ private:
 		        	   const glm::mat4 crop = glm::mat4(1));
 
 public:
+	std::vector<float> texture_scale_;
 	std::vector<float> height_data_;
 	std::vector<Shader> shaders_;
+	std::string path_cache_;
 	GLuint quad_vao_, quad_vbo_;
 	GLuint terrain_vao_;
 	int grid_size_, terrain_size_, grid_high_res_;
 
-	std::shared_ptr<RenderTarget> noise_;
-	std::shared_ptr<RenderTarget> noise_high_res_;
-	std::shared_ptr<RenderTarget> normal_;
-	std::shared_ptr<RenderTarget> texture_id_high_res_;
-	std::shared_ptr<RenderTarget> texture_id_blur_;
+	glm::vec3 height_clamp_;
+	glm::vec2 noise_scale_;
+	glm::vec2 seed_;
 
-	GLuint height_scale_;
-	GLuint texture_id_;
-	GLuint terrain_textures_;
+	GLuint height_raw_low_;
+	GLuint layer_blend_raw_low_[2];
+	GLuint textures_;
+
+	std::shared_ptr<RenderTarget> readback_;
+	std::shared_ptr<RenderTarget> height_;
+	std::shared_ptr<RenderTarget> normal_;
+	std::shared_ptr<RenderTarget> blend_blur_;
+	std::shared_ptr<RenderTarget> blend_;
 };
 
 

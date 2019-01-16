@@ -78,6 +78,11 @@ void RenderTarget::append_rgb_float16() {
 			GL_CLAMP_TO_EDGE);
 }
 
+void RenderTarget::append_rgb_float16_bilinear() {
+	append(GL_LINEAR, GL_LINEAR, GL_RGB16F, GL_RGB, GL_FLOAT,
+			GL_CLAMP_TO_EDGE);
+}
+
 void RenderTarget::append_rgb_uint8() {
 	append(GL_NEAREST, GL_NEAREST, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE,
 			GL_CLAMP_TO_EDGE);

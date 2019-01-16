@@ -19,6 +19,7 @@
 #include "bullet_engine/bullet_terrain.h"
 #include "render_engine/model.h"
 #include "render_engine/render_world.h"
+#include "render_engine/terrain_shape.h"
 
 #include "inventory.h"
 
@@ -32,7 +33,7 @@ typedef float xScalar;
 #endif
 
 class Inventory;
-class Terrain;
+class TerrainWorld;
 class RobotBase;
 class World;
 
@@ -40,8 +41,8 @@ typedef std::shared_ptr<RobotBase> RobotBaseSPtr;
 typedef std::weak_ptr<RobotBase> RobotBaseWPtr;
 typedef std::shared_ptr<World> WorldSPtr;
 typedef std::weak_ptr<World> WorldWPtr;
-typedef std::shared_ptr<Terrain> TerrainSptr;
-typedef std::weak_ptr<Terrain> TerrainWptr;
+typedef std::shared_ptr<TerrainWorld> TerrainSptr;
+typedef std::weak_ptr<TerrainWorld> TerrainWptr;
 typedef unsigned char byte_t; 
 typedef double height_t;
 
@@ -405,13 +406,13 @@ struct ObjectAttributes {
     int bullet_id;
 };
 
-class Terrain : public render_engine::RenderTerrain,
-                public bullet_engine::BulletTerrain,
-                public std::enable_shared_from_this<Terrain>  {
+class TerrainWorld : public render_engine::RenderTerrain,
+                     public bullet_engine::BulletTerrain,
+                     public std::enable_shared_from_this<TerrainWorld>  {
     using RenderTerrain = render_engine::RenderTerrain;
 public:
-    Terrain(const WorldWPtr& bullet_world);
-    ~Terrain();
+    TerrainWorld(const WorldWPtr& bullet_world);
+    ~TerrainWorld();
 
     void load_terrain_from_height_map() override;
 
@@ -438,8 +439,9 @@ public:
 
     void UpdatePickableList(const std::string& tag, const bool pick);
 
-    void GenerateTerrain(const int grid_size, const int terrain_size, 
-            TerrainDatas_t* terrain_data);
+    void GenerateTerrain(const int grid_size, const int terrain_size,
+            const glm::vec2 noise, const glm::vec3 clamp, const glm::vec2 seed,
+            TerrainDatas_t* terrain_data, TerrainLayers_t* terrain_layer);
 
     RobotBaseWPtr LoadRobot(
             const std::string& filename,

@@ -21,8 +21,6 @@ uniform vec3 cameraPosition;
 
 uniform float exposure = 0.0f;
 uniform DirectionalLight light;
-uniform vec3 up_ambient = vec3(0.1);
-uniform vec3 low_ambient = vec3(0.8);
 
 uniform float use_shadow;
 uniform vec4 direction;
@@ -103,11 +101,8 @@ void main()
     vec3 color = albedo;
 
     if(depth < 1) {
-        float w = 0.5 * (1.0 + dot(vec3(0,1,0), world_normal));
-        vec3 ambient = (w * up_ambient + (1.0 - w) * low_ambient) * albedo;
-
         color = BRDF(light, world_normal, world_position, albedo, roughness) * shadow;
-        color += albedo * light.ambient * ambient;
+        color += albedo * light.ambient;
         color = color * pow(2.0f, exposure);
     }
 

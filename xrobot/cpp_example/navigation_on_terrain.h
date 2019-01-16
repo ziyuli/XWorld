@@ -8,7 +8,8 @@
 #include "render_engine/render.h"
 
 #include "game_engine/lidar.h"
-#include "game_engine/map_terrain.h"
+#include "game_engine/suncg.h"
+#include "game_engine/terrain.h"
 #include "game_engine/navigation.h"
 #include "game_engine/state_machine.h"
 #include "game_engine/task.h"
@@ -25,7 +26,7 @@ namespace xrobot
 	public:
 
 		Task_Terrain(std::shared_ptr<render_engine::Render> renderer,
-				   std::shared_ptr<MapTerrain> map);
+				     std::shared_ptr<Map> map);
 		~Task_Terrain();
 
 		std::string Start();
@@ -36,7 +37,9 @@ namespace xrobot
 		float cam_pitch_;
 
 		std::weak_ptr<RobotBase> agent_;
-		std::shared_ptr<MapTerrain> scene_;
+		std::shared_ptr<Suncg> house_;
+		std::shared_ptr<Terrain> terrain_;
+		std::shared_ptr<Map> scene_;
 		std::shared_ptr<render_engine::Render> renderer_;
 
 		render_engine::GLContext * ctx_;

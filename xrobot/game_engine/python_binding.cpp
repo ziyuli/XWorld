@@ -1,7 +1,8 @@
 #include "python_binding.h"
 
-NavAgent::NavAgent(const int uid, const std::string& label) 
-    : label_(label), uid_(uid) {}
+NavAgent::NavAgent(const int uid, 
+                   const std::string& label) : label_(label), 
+                                               uid_(uid) {}
 
 Thing::Thing() : label_("Nothing"),
 				 position_(vec2tuple(glm::vec3(0,0,0))) {}
@@ -24,7 +25,7 @@ std::string Thing::GetLabel()
 {
 	if(Sync()) 
 	   return label_;
-    return "Not available";
+    return "Nothing";
 }
 
 bool Thing::Sync()
@@ -36,22 +37,22 @@ bool Thing::Sync()
 		btVector3 pos_bt = tr_bt.getOrigin();
         btQuaternion orn_bt = tr_bt.getRotation();
 		position_ = vec2tuple(glm::vec3(pos_bt[0], pos_bt[1], pos_bt[2]));
-        orientation_ = vec2tuple(glm::vec4(orn_bt[0], orn_bt[1], orn_bt[2], orn_bt[3]));
+        orientation_ = vec2tuple(glm::vec4(orn_bt[0], 
+                                           orn_bt[1], 
+                                           orn_bt[2], 
+                                           orn_bt[3]));
 		label_ = robot_sptr->body_data_.label;
         return true;
 	} 
     return false;
-}
+} 
 
 Playground::Playground(const int w, const int h,
                        const int headless, const int quality, const int device)
 {
-	assert(quality > -1 && quality < 5);
-	
-	render_engine::Profile render_profile = render_engine::profiles[quality];
-
-	renderer_ = std::make_shared<render_engine::Render>(w, h, 
-                                                        render_profile, 
+	renderer_ = std::make_shared<render_engine::Render>(w, 
+                                                        h, 
+                                                        quality, 
                                                         headless,
                                                         device);
 
@@ -71,6 +72,8 @@ Playground::Playground(const int w, const int h,
     crowd_ = nullptr;
     inventory_ = nullptr;
     lidar_ = nullptr;
+    suncg_ = nullptr;
+    terrain_ = nullptr;
     objects_ = std::vector<Thing>();
 }
 
@@ -311,6 +314,12 @@ void Playground::ClearSpawnObjectsExceptAgent()
         }
     }
 
+    if(terrain_)
+        terrain_->Reset();
+
+    if(suncg_)
+        suncg_->Reset();
+
     if(crowd_)
         crowd_->Reset();
 
@@ -320,14 +329,21 @@ void Playground::ClearSpawnObjectsExceptAgent()
 
 void Playground::Clear()
 {
-    if(scene_)  
-	   scene_->ResetMap();
+    if(terrain_)
+        terrain_->Reset();
 
     if(crowd_)
         crowd_->Reset();
 
+    if(suncg_)
+        suncg_->Reset();
+
 	if(inventory_)
 		inventory_->ClearInventory();
+
+    if(scene_)  
+       scene_->ResetMap();
+
         //inventory_->ResetPickableObjectTag();
 	
     objects_.clear();
@@ -352,20 +368,6 @@ void Playground::CreateArena(const int width, const int length)
     scene_grid->LoadWallURDF(test_wall);
     scene_grid->CreateAndLoadTileURDF(test_floor);
 	scene_grid->GenerateArena(width, length);
-
-	// if(inventory_) {
-	    
-	// }
-
-    // renderer_->sunlight_.ambient = glm::vec3(0.02,0.02,0.02);
-    // renderer_->lighting_.exposure = 0.3f;
-    // renderer_->lighting_.indirect_strength = 0.25f;
-    // renderer_->lighting_.traceshadow_distance = 0.3f;
-    // renderer_->lighting_.propagation_distance = 0.3f;
-    // renderer_->lighting_.sample_factor = 0.7f;
-    // renderer_->lighting_.boost_ambient = 0.01f;
-    // renderer_->lighting_.shadow_bias_scale = 0.0003f;
-    // renderer_->lighting_.linear_voxelize = true;
 }
 
 void Playground::CreateRandomGenerateScene()
@@ -377,16 +379,6 @@ void Playground::CreateRandomGenerateScene()
 
     std::shared_ptr<MapGrid> scene_grid 
         = std::dynamic_pointer_cast<MapGrid>(scene_);
-
-    // renderer_->sunlight_.ambient = glm::vec3(0.15,0.15,0.15);
-    // renderer_->lighting_.exposure = 1.5f;
-    // renderer_->lighting_.indirect_strength = 0.4f;
-    // renderer_->lighting_.traceshadow_distance = 0.5f;
-    // renderer_->lighting_.propagation_distance = 0.5f;
-    // renderer_->lighting_.sample_factor = 0.4f;
-    // renderer_->lighting_.boost_ambient = 0.02f;
-    // renderer_->lighting_.shadow_bias_scale = 0.0003f;
-    // renderer_->lighting_.linear_voxelize = false;
 }
 
 void Playground::LoadXWorldScene(const std::string& filename)
@@ -715,22 +707,116 @@ boost::python::list Playground::LoadSceneConfigure(const int w, const int l,
     return ret;
 }
 
+void Playground::CreateTerrain(const boost::python::list layers,
+                               const boost::python::list scales,
+                               const float height,
+                               const int terrain_size,
+                               const int grid_size)
+{
+    if(!scene_) 
+        return;
+    
+    if(!terrain_)
+        terrain_ = std::make_shared<Terrain>(scene_->world_);
+
+    int num_layers = boost::python::len(layers);
+
+    for (int i = 0; i < num_layers; ++i) {
+        std::string layer = boost::python::extract<std::string>(layers[i]);
+        float scale = boost::python::extract<float>(scales[i]);
+        terrain_->AddTerrainLayer(layer, scale);   
+    }
+
+    terrain_->GenerateTerrain(terrain_size, grid_size, height);
+}
+
+void Playground::PaintPuddle(const boost::python::list position,
+                             const float scale,
+                             const float height,
+                             const int id)
+{
+    if(terrain_) {
+        float px = boost::python::extract<float>(position[0]);
+        float pz = boost::python::extract<float>(position[1]);
+        terrain_->GeneratePuddle(glm::vec2(px, pz), scale, height, id);
+    }
+}
+
+void Playground::PaintCircle(const boost::python::list position,
+                             const float scale,
+                             const float height,
+                             const int id)
+{
+    if(terrain_) {
+        float px = boost::python::extract<float>(position[0]);
+        float pz = boost::python::extract<float>(position[1]);
+        terrain_->GenerateCircle(glm::vec2(px, pz), scale, height, id);
+    }
+}
+
+void Playground::PaintBox(const boost::python::list min_aabb,
+                          const boost::python::list max_aabb,
+                          const float height,
+                          const int id)
+{
+    if(terrain_) {
+        float minx = boost::python::extract<float>(min_aabb[0]);
+        float miny = boost::python::extract<float>(min_aabb[1]);
+        float minz = boost::python::extract<float>(min_aabb[2]);
+        float maxx = boost::python::extract<float>(max_aabb[0]);
+        float maxy = boost::python::extract<float>(max_aabb[1]);
+        float maxz = boost::python::extract<float>(max_aabb[2]);
+        terrain_->GenerateBox(glm::vec3(minx, miny, minz),
+                              glm::vec3(maxx, maxy, maxz),
+                              height, id);
+    }
+}
+
+void Playground::PaintCurve(const boost::python::list control_points,
+                            const float scale,
+                            const int prec,
+                            const int id)
+{
+    if(terrain_) {
+
+        int num_control_points = boost::python::len(control_points);
+        std::vector<glm::vec3> points;
+
+        for (int i = 0; i < num_control_points; ++i) {
+            float px = boost::python::extract<float>(control_points[3 * i + 0]);
+            float py = boost::python::extract<float>(control_points[3 * i + 1]);
+            float pz = boost::python::extract<float>(control_points[3 * i + 2]);
+            points.push_back(glm::vec3(px, py, pz));
+        }
+        terrain_->GeneratePath(points, prec, scale, id);
+    }
+}
+
+void Playground::LoadTerrain(const boost::python::list clamp,
+                             const boost::python::list noise)
+{
+    if(terrain_) {
+        float noise_l = boost::python::extract<float>(noise[0]);
+        float noise_h = boost::python::extract<float>(noise[1]);
+        float clamp_l = boost::python::extract<float>(clamp[0]);
+        float clamp_h = boost::python::extract<float>(clamp[1]);
+        float op = boost::python::extract<float>(clamp[2]);
+        terrain_->LoadTerrain(glm::vec3(clamp_l, clamp_h, op),
+                              glm::vec2(noise_l, noise_h));
+    }
+}
+
 void Playground::CreateSceneFromSUNCG()
 {
     if(!scene_)
-        scene_ = std::make_shared<MapSuncg>();
+        scene_ = std::make_shared<Map>();
 
-    std::shared_ptr<MapSuncg> scene_suncg 
-        = std::dynamic_pointer_cast<MapSuncg>(scene_);
+    std::shared_ptr<Map> scene_suncg 
+        = std::dynamic_pointer_cast<Map>(scene_);
 
-    scene_suncg->SetMapSize(-8, -8, 8, 8);
 
-    // renderer_->sunlight_.direction = glm::vec3(0.3, 1, 1);
-    // renderer_->lighting_.exposure = 1.0f;
-    // renderer_->lighting_.indirect_strength = 1.5f;
-    // renderer_->lighting_.traceshadow_distance = 0.3f;
-    // renderer_->lighting_.propagation_distance = 0.3f;
-    // renderer_->lighting_.force_disable_shadow = true;
+
+    scene_suncg->world_->set_world_size(-8, -8, 8, 8);
 }
 
 void Playground::CreateEmptyScene(const float min_x, const float max_x,
@@ -738,54 +824,41 @@ void Playground::CreateEmptyScene(const float min_x, const float max_x,
 {
     if(!scene_) {
         scene_ = std::make_shared<Map>();
-        scene_->GenerateGenetricMap();
+        scene_->GenerateMap();
     }
 
     scene_->world_->inventory_size_ = 0;
     scene_->world_->set_world_size(min_x, min_z, max_x, max_z);
-
-    // renderer_->sunlight_.direction = glm::vec3(0.3, 1, 1);
-    // renderer_->lighting_.exposure = 1.0f;
-    // renderer_->lighting_.indirect_strength = 1.5f;
-    // renderer_->lighting_.traceshadow_distance = 0.3f;
-    // renderer_->lighting_.propagation_distance = 0.3f;
-    // renderer_->lighting_.force_disable_shadow = true;
 }
 
 void Playground::LoadSUNCG(const std::string& house,
                            const std::string& metadata,
                            const std::string& suncg_data_dir,
+                           const boost::python::list offset,
                            const int filter)
 {
-    if(!scene_)
-    {
-        printf("Use Playground::CreateSceneFromSUNCG first for initializing!\n");
+    if(!scene_) 
         return;
-    }
 
-    std::shared_ptr<MapSuncg> scene_suncg 
-        = std::dynamic_pointer_cast<MapSuncg>(scene_);
+    if(!suncg_)
+        suncg_ = std::make_shared<Suncg>(scene_->world_);
 
     scene_->world_->inventory_size_ = 0;
 
     if(filter > -1)
-        scene_suncg->SetRemoveAll(filter);
+        suncg_->SetRemoveAll(filter);
 
-    // TODO
-    // Assign Props
+    suncg_->LoadCategoryCSV(metadata.c_str());
 
-    scene_suncg->LoadCategoryCSV(metadata.c_str());
-
-    scene_suncg->LoadJSON(house.c_str(), suncg_data_dir.c_str(), true);
-
-    // TODO
-    // Assign Map Size
-
-    if(inventory_) {
-        // inventory_->AddNonPickableObjectTag("Wall");
-        // inventory_->AddNonPickableObjectTag("Floor");
-        // inventory_->AddNonPickableObjectTag("Ceiling");
+    glm::vec3 offset_vec(0, 0, 0);   
+    if(boost::python::len(offset) == 3) {
+        float offset_x = boost::python::extract<float>(offset[0]);
+        float offset_y = boost::python::extract<float>(offset[1]);
+        float offset_z = boost::python::extract<float>(offset[2]);
+        offset_vec = glm::vec3(offset_x, offset_y, offset_z);
     }
+
+    suncg_->LoadJSON(house.c_str(), suncg_data_dir.c_str(), true, offset_vec);
 }
 
 void Playground::ResolvePath() 
@@ -829,7 +902,7 @@ Thing Playground::SpawnAnObject(const std::string& file,
         orentation.w,
         glm::vec3(scale, scale, scale),
         label,
-        fixed // fixed ? 0 : 100
+        fixed
     );
 
 	if(auto obj_sptr = obj_wptr.lock()) {
@@ -931,8 +1004,7 @@ void Playground::Initialize()
 		obj_sptr->UnFreeze();
 	}
 
-    // glm::vec3 world_front(1,0,0);
-    // float angle = 
+    renderer_->BakeGI();
 
     camera_yaw_ = 0.0f;
 }
@@ -1589,7 +1661,7 @@ void Playground::ControlJointVelocities(const Thing& object,
             float velocity = boost::python::extract<float>(joint_velocities[joint_id]);
 
             auto joint_ptr = object_sptr->joints_[joint_id];
-            joint_ptr->SetJointMotorControlVelocity(velocity, 1.0f, max_force);
+            joint_ptr->SetJointMotorControlVelocity(velocity, 0.1f, max_force);
         }
     }
 }

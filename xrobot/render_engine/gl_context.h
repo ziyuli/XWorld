@@ -83,7 +83,7 @@ protected:
 // Context for GLFW
 class GLFWContext : public GLContext {
   public:
-    GLFWContext(int h, int w, bool core = true);
+    GLFWContext(int h, int w, bool hide = false, bool core = true);
     ~GLFWContext();
 
     void Hide() override;
@@ -175,11 +175,11 @@ protected:
     Display* dpy_;
 };
 
-inline GLContext* CreateContext(int h, int w, int device=0) {
+inline GLContext* CreateContext(int h, int w, bool hide = false, int device=0) {
     #ifdef USE_GLX
         return new GLXVisualizationContext{h, w};
     #else
-        return new GLFWContext{h, w};
+        return new GLFWContext{h, w, hide};
     #endif
 }
 

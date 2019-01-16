@@ -24,11 +24,12 @@ int main(int argc, char **argv)
 {
     assert(argc < 3);
 
-    render_engine::Profile profile = render_engine::kVeryLowQualityVisualize;
-    if(argc == 2 && atoi(argv[1]) < 5) 
+    int profile = render_engine::kLow;
+    if(argc == 2 && atoi(argv[1]) < 6) 
         profile = render_engine::profiles[atoi(argv[1])];
 
-    profile.multirays = true;
+    profile |= render_engine::kDepthCapture;
+    profile |= render_engine::kVisualization;
 
     std::shared_ptr<MapGrid> scene = std::make_shared<MapGrid>();
     std::shared_ptr<render_engine::Render> renderer = 

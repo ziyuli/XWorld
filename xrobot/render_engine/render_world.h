@@ -12,19 +12,55 @@
 
 namespace xrobot {
 
+struct TerrainLayer {
+    std::string path;
+    float scale;
+};
+
 struct TerrainData {
-    TerrainData() : texture_layer_id(0), height(0), occupy(false) {}
-    TerrainData(const unsigned int id, 
-                const float h, 
-                const bool o) : texture_layer_id(id),
-                                height(h),
+    TerrainData() : height(0),
+                    occupy(false) {
+        texture_layer_masks[0] = glm::vec4(0);
+        texture_layer_masks[1] = glm::vec4(0);
+    }
+                    
+    TerrainData(const float h, 
+                const bool o) : height(h),
                                 occupy(o) {}
-                                
-    unsigned int texture_layer_id;
+
+    float GetBlend(const int layer) {
+        assert(layer < 8);
+
+        int index   = layer / 4;
+        int channel = layer % 4;
+        return texture_layer_masks[index][channel];
+    }
+
+    void SetBlend(const int layer, const float blend = 1.0f) {
+        assert(layer < 8);
+
+        int index   = layer / 4;
+        int channel = layer % 4;
+        texture_layer_masks[index][channel] = blend;
+    }
+
+    void SetBlendOverride(const int layer, const float blend = 1.0f) {
+        assert(layer < 8);
+
+        texture_layer_masks[0] = glm::vec4(0);
+        texture_layer_masks[1] = glm::vec4(0);
+
+        int index   = layer / 4;
+        int channel = layer % 4;
+        texture_layer_masks[index][channel] = blend;
+    }
+
+    glm::vec4 texture_layer_masks[2]; 
     float height;
     bool occupy;
 };
 
+typedef std::vector<TerrainLayer> TerrainLayers_t;
 typedef std::vector<TerrainData> TerrainDatas_t;
 
 namespace render_engine {
@@ -107,7 +143,11 @@ public:
                       terrain_size_(0),
                       update_(false),
                       height_data_(0),
-                      terrain_data_(0) {}
+                      terrain_data_(0),
+                      terrain_layers_(0),
+                      seed_(glm::vec2(0, 0)),
+                      clamp_(glm::vec3(-1.0f, 1.0f, 0.0f)),
+                      noise_scale_(glm::vec2(0.1f, 0.3f)) {}
 
     virtual ~RenderTerrain() {}
 
@@ -116,8 +156,12 @@ public:
     int grid_size_;
     int terrain_size_;
     bool update_;
+    glm::vec2 seed_;
+    glm::vec3 clamp_;
+    glm::vec2 noise_scale_;
     std::vector<float> height_data_;
     TerrainDatas_t* terrain_data_;
+    TerrainLayers_t* terrain_layers_;
 };
 
 class RenderWorld {

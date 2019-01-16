@@ -655,27 +655,6 @@ AABB struct
 
 ```
 
-**Be aware of "!=" between two range! The not equal operator is actually intersection test!**
-
-## NavAgent
-
-A special type of object or robot with navigation ability
-
-* Example:
-
-```python
-
-    nav_agent = my_playground.SpawnNavigationAgent(model_path, "model_label", position, orientation)
-
-    ## Print the Label of the Thing
-    ## console output: model_label
-    print str(nav_agent)
-
-    if nav_agent == another_nav_agent:
-        print "They are the same!"
-
-```
-
 ## Get Observation and Action Space
 
 * Example:
@@ -710,3 +689,17 @@ You can retrieve position and orientation from the camera.
     my_playground.GetFarClippingDistance()
 
 ```
+
+# Experimental
+
+## Navigation Agent
+
+Special type of objects or robots with path-finding ability
+
+## Terrain
+
+Outdoor environment
+
+## Multi-rays Lidar
+
+Depth map based multi-ray lidar simulation

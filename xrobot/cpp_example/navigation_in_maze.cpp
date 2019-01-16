@@ -37,12 +37,10 @@ namespace xrobot
 
 		// Load Assets
 		scene_->world_->LoadMetadata(test_meta.c_str());
-		scene_->world_->AssignTag(apple, "apple");
 		scene_->CreateAndLoadTileURDF(test_floor);
 		scene_->LoadWallURDF(test_wall);
 	    scene_->CreateAndLoadObjectFILE(crate1, "crate");
-	    scene_->CreateAndLoadObjectFILE(crate03, "crate");
-	    scene_->CreateAndLoadObjectFILE(apple, "apple");
+	    scene_->CreateAndLoadObjectFILE(crate03, "box");
 
 	    // Generate Maze Layout
 	    glm::vec3 startPosition = scene_->GenerateLayout(5, 5, 3, 2);
@@ -110,7 +108,7 @@ namespace xrobot
 
         // Check In-Range
         std::vector<ObjectAttributes> temp;
-        scene_->world_->QueryObjectByLabel("apple", temp);
+        scene_->world_->QueryObjectByLabel("box", temp);
 
         for(int i = 0; i < temp.size(); ++i)
         {
@@ -160,7 +158,6 @@ namespace xrobot
         // Step Simulation and Renderer
         scene_->world_->BulletStep();   
         renderer_->StepRender(scene_->world_.get());
-
         return "NavTarget";
 	}
 }

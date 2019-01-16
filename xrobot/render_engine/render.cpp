@@ -10,9 +10,9 @@ namespace render_engine {
 
 Render::Render(const int width,
 	           const int height,
-	           const Profile profile,
-	           const bool headless,
-	           const int device) : profile_(profile),
+	           const int conf,
+	           const int headless,
+	           const int device) : conf_(conf),
 								   lighting_(),
 								   shaders_(0),
 								   width_(width),
@@ -21,13 +21,11 @@ Render::Render(const int width,
 								   quad_vbo_(0) {
 	
 	// Create Context
-	if(headless) {
-		profile_.visualize = false;
+	if(headless > 0) {
 		ctx_ = render_engine::CreateHeadlessContext(height, width, device);
 	} else {
-		profile_.visualize = true;
-		ctx_ = render_engine::CreateContext(height, width);
-	}
+		ctx_ = render_engine::CreateContext(height, width, headless < 0);
+	} 
 
 	// Check OpenGL Version
 	CheckVersion();
@@ -71,10 +69,10 @@ void Render::CheckVersion() {
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
 
-	if(profile_.vct) {
+	if(conf_ & kVCT) {
 		if(major < 4 || major == 4 && minor < 2) {
 			printf("[Renderer] VCT requires at least OpenGL 4.2\n");
-			if(profile_.visualize)
+			if(conf_ & kVisualization)
 				printf("[Renderer] The driver or hardware is not OpenGL 4.2 compatible\n\n");
 			else
 				printf("[Renderer] Disable headless rendering!\n\n"); 
@@ -83,10 +81,10 @@ void Render::CheckVersion() {
 			exit(0);
 		}
 	} else if(terrain_) {
-		if(major < 4 || major == 4 && minor < 1) {
-			printf("[Renderer] Terrain requires at least OpenGL 4.1\n");
-			if(profile_.visualize)
-				printf("[Renderer] The driver or hardware is not OpenGL 4.2 compatible\n\n");
+		if(major < 4) {
+			printf("[Renderer] Terrain requires at least OpenGL 4.0\n");
+			if(conf_ & kVisualization)
+				printf("[Renderer] The driver or hardware is not OpenGL 4.0 compatible\n\n");
 			else
 				printf("[Renderer] Disable headless rendering!\n\n"); 
 			ctx_->PrintInfo();
@@ -142,7 +140,7 @@ void Render::StepRender(RenderWorld* world) {
 
 	// Visualization
 	glClear(GL_COLOR_BUFFER_BIT);
-	if(profile_.visualize) {
+	if(conf_ & kVisualization) {
 
 		float width_quater  = width_ * 0.25f;
 		float height_quater = height_ * 0.25f;
@@ -153,19 +151,9 @@ void Render::StepRender(RenderWorld* world) {
 		RenderTexture(hud_pass_->texture_id(0), width_quater, height_quater,
 				width_quater + 20, 10, true);
 
-		// if(profile_.multirays) 
-		// 	RenderTexture(capture, 280, 70, 
-		// 			width_quater * 2 + 30, 10, true, 0);
-
-		// glm::mat4 projection = visualize_->free_camera_.GetProjectionMatrix();
-		// glm::mat4 view = visualize_->free_camera_.GetViewMatrix();
-		// glm::vec3 camera_pos = visualize_->free_camera_.position_;
-		// glm::vec3 light_dir = dir_light_.direction;
-		// RenderTexture(geomtry_pass_->texture_id(1), 320, 240);
-		// RenderTexture(terrain_->height_scale_, 100, 100, 500);
-		// RenderTexture(terrain_->texture_id_, 100, 100, 540);
-		// terrain_->RenderTerrain(camera_pos, view, projection);
-		// RenderTexture(terrain_->debug_->texture_id(0), 320, 240, 256);
+		if(conf_ & kDepthCapture) 
+			RenderTexture(capture, 280, 70, 
+					width_quater * 2 + 30, 10, true, 0);
 	}
 
 	// Swap
@@ -318,9 +306,9 @@ void Render::RenderHUD(RenderWorld* world,
 }
 
 void Render::RenderLightingPass(RenderWorld* world, Camera* camera, GLuint& rgb) {
-	if (!profile_.shading) {
+	if (!(conf_ & kShading)) {
 		rgb   = geomtry_pass_->texture_id(2);
-	} else if (!profile_.vct) {
+	} else if (!(conf_ & kVCT)) {
 		rgb   = lighting_pass_->texture_id(0);
 		RenderNormalShading(camera);
 	} else {
@@ -358,9 +346,9 @@ void Render::RenderNormalShading(Camera* camera) {
 	blinn.setVec3("light.diffuse", dir_light_.diffuse);
 	blinn.setVec3("light.specular", dir_light_.specular);
 	blinn.setVec3("light.direction", dir_light_.direction);
-	blinn.setFloat("use_shadow", (float) profile_.shadow);
+	blinn.setFloat("use_shadow", (float) (conf_ & kShadow));
 
-	if(profile_.shadow) {
+	if(conf_ & kShadow) {
 		blinn.setVec4("direction", shadow_.csm_uniforms.direction);
 		blinn.setVec4("options", shadow_.csm_uniforms.options);
 		blinn.setInt("num_cascades", shadow_.csm_uniforms.num_cascades);
@@ -494,15 +482,18 @@ void Render::RenderTerrainHeightMap(RenderWorld* world) {
 		RenderTerrain* rt = world->get_terrain();
 
 		if(!terrain_) {
-			terrain_ = std::make_shared<Terrain>(rt->grid_size_,
-												 rt->terrain_size_);
-			if(profile_.visualize){
+			terrain_ = std::make_shared<TerrainShape>(rt->grid_size_,
+												      rt->terrain_size_);
+			if(conf_ & kVisualization){
 				visualize_->InitDrawTerrain(terrain_);
 			}
 		}
 
 		if(rt->update_) {
-			terrain_->GenerateHeightMap(rt->terrain_data_);
+			terrain_->Reset();
+			terrain_->LoadTerrainParameters(rt->noise_scale_, rt->clamp_, rt->seed_);
+			terrain_->LoadTerrainTextures(rt->terrain_layers_);
+			terrain_->LoadTerrainData(rt->terrain_data_);
 			rt->height_data_ = terrain_->GetHeightMapData();
 			rt->update_ = false;
 			rt->load_terrain_from_height_map();
@@ -513,13 +504,13 @@ void Render::RenderTerrainHeightMap(RenderWorld* world) {
 // --------------------------------------------------------------------------------------------
 
 void Render::InitPostProcessing() {
-	if(profile_.ao) 
+	if(conf_ & kAO) 
 		ssao_ = std::make_shared<SSAO>(width_, height_);
 
-	if(profile_.ssr) 
+	if(conf_ & kSR) 
 		ssr_ = std::make_shared<SSR>(width_, height_);
 	
-	if(profile_.fxaa) 
+	if(conf_ & kAA) 
 		fxaa_ = std::make_shared<FXAA>(width_, height_);
 
 	composite_ = std::make_shared<Composite>(width_, height_);
@@ -529,7 +520,7 @@ void Render::RenderPostProcessingPasses(Camera* camera,
 		const std::vector<GLuint>& in, GLuint& out) {
 	// SSAO
 	std::vector<GLuint> ssao_out(1);
-	if (profile_.ao) {
+	if (conf_ & kAO) {
 		glm::mat4 view = camera->GetViewMatrix();
 		glm::mat4 projection = camera->GetProjectionMatrix();
 
@@ -541,7 +532,7 @@ void Render::RenderPostProcessingPasses(Camera* camera,
 
 	// SSR
 	std::vector<GLuint> ssr_out(1);
-	if (profile_.ssr) {
+	if (conf_ & kSR) {
 		glm::mat4 view = camera->GetViewMatrix();
 		glm::mat4 projection = camera->GetProjectionMatrix();
 
@@ -559,11 +550,11 @@ void Render::RenderPostProcessingPasses(Camera* camera,
 	composite_in.push_back(ssao_out[0]);
 	composite_in.push_back(ssr_out[0]);
 	composite_->Draw(composite_in, composite_out, 
-			profile_.ao, profile_.ssr, profile_.shading);
+			conf_ & kAO, conf_ & kSR, conf_ & kShading);
 
 	// FXAA
 	std::vector<GLuint> fxaa_out(1);
-	if(profile_.fxaa) {
+	if(conf_ & kAA) {
 		std::vector<GLuint> fxaa_in;
 		fxaa_in.push_back(composite_out[0]);
 		fxaa_->Draw(fxaa_in, fxaa_out);
@@ -577,7 +568,7 @@ void Render::RenderPostProcessingPasses(Camera* camera,
 // --------------------------------------------------------------------------------------------
 
 void Render::InitShadowMaps(const float fov) {
-	if(!profile_.shadow) 
+	if(!(conf_ & kShadow)) 
 		return;
 
 	if(shadow_.first_run) {
@@ -603,7 +594,7 @@ void Render::InitShadowMaps(const float fov) {
 }
 
 void Render::RenderShadowMaps(RenderWorld* world, Camera* camera) {
-	if(!profile_.shadow) 
+	if(!(conf_ & kShadow)) 
 		return;
 
 	InitShadowMaps(camera->GetFOV());
@@ -652,8 +643,8 @@ void Render::RenderShadowMaps(RenderWorld* world, Camera* camera) {
 // --------------------------------------------------------------------------------------------
 
 void Render::InitVCT() {
-	if(profile_.vct) {
-		if(!profile_.shadow) {
+	if(conf_ & kVCT) {
+		if(!(conf_ & kShadow)) {
 			printf("[Renderer] VCT requires shadow mapping!\n");
 			exit(-1);
 		}
@@ -662,22 +653,22 @@ void Render::InitVCT() {
 }
 
 void Render::BakeGI() {
-	if(profile_.vct) 
+	if(conf_ & kVCT) 
 		vct_->ForceBakeOnNextFrame();
 }
 
 // --------------------------------------------------------------------------------------------
 
 void Render::InitVisualization() {
-	if(profile_.visualize) {
+	if(conf_ & kVisualization) {
 		visualize_ = std::make_shared<Visualization>(width_, height_, ctx_);
 	}
 }
 
 void Render::RenderVisualization(RenderWorld* world, Camera *camera) {
-	if(profile_.visualize) {
+	if(conf_ & kVisualization) {
 		GLuint lidar_capture = 0;
-		if(profile_.multirays && capture_) { 
+		if((conf_ & kDepthCapture) && capture_) { 
 			lidar_capture = capture_->GetRawCubeMap();
 		}		
 		visualize_->Visualize(world, camera, lidar_capture);
@@ -687,12 +678,12 @@ void Render::RenderVisualization(RenderWorld* world, Camera *camera) {
 // --------------------------------------------------------------------------------------------
 
 void Render::UpdateRay(const int offset, const glm::vec3 from, const glm::vec3 to) {
-	if(profile_.visualize && visualize_)
+	if((conf_ & kVisualization) && visualize_)
 		visualize_->UpdateRay(offset, from, to);
 }
 
 void Render::InitDrawBatchRays(const int rays) {
-	if(profile_.visualize && visualize_) {
+	if((conf_ & kVisualization) && visualize_) {
 		visualize_->InitDrawBatchRays(rays);
 	}
 }
@@ -700,13 +691,13 @@ void Render::InitDrawBatchRays(const int rays) {
 // --------------------------------------------------------------------------------------------
 
 void Render::InitLidarCapture() {
-	if(profile_.multirays) {
+	if(conf_ & kDepthCapture) {
 		capture_ = std::make_shared<Capture>(kLidarCaptureRes);
 	}
 }
 
 void Render::RenderLidarCapture(RenderWorld* world, Camera* camera, GLuint& depth) {
-	if(profile_.multirays) {
+	if(conf_ & kDepthCapture) {
 		capture_->RenderCubemap(world, camera);
 		capture_->Stitch(depth, lidar_image_);
 	}

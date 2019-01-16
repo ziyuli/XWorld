@@ -1,26 +1,24 @@
-#include "map_suncg.h"
+#include "suncg.h"
 
 namespace xrobot
 {
 
-MapSuncg::~MapSuncg() {}
-
-MapSuncg::MapSuncg() : Map(),
-					   all_labels_(),
-					   map_bullet_label_(),
-					   rand_device_(),
-					   mt_(rand_device_()),
-					   remove_all_doors_(false),
-					   remove_all_stairs_(false),
-					   remove_randomly_(false),
-					   map_labels_properity()
-{
-	world_ = std::make_shared<World>();
-	world_->BulletInit(-9.81f, 0.01f);
+Suncg::~Suncg() {
+	Reset();
 }
 
-// This function is adapted from SUNCG!
-int MapSuncg::GetJsonArrayEntry(Json::Value *&result, Json::Value *array, unsigned int k, int expected_type)
+Suncg::Suncg(std::shared_ptr<World> world) : world_(world),
+											 all_labels_(),
+			                                 map_bullet_label_(),
+			                                 rand_device_(),
+			                                 mt_(rand_device_()),
+			                                 remove_all_doors_(false),
+			                                 remove_all_stairs_(false),
+			                                 remove_randomly_(false),
+			                                 map_labels_properity() {}
+
+	// This function is adapted from SUNCG!
+int Suncg::GetJsonArrayEntry(Json::Value *&result, Json::Value *array, unsigned int k, int expected_type)
 {
   // Check array type
   if (array->type() != Json::arrayValue) {
@@ -54,7 +52,7 @@ int MapSuncg::GetJsonArrayEntry(Json::Value *&result, Json::Value *array, unsign
 }
 
 // This function is adapted from SUNCG!
-int MapSuncg::GetJsonObjectMember(Json::Value *&result, Json::Value *object, const char *str, int expected_type)
+int Suncg::GetJsonObjectMember(Json::Value *&result, Json::Value *object, const char *str, int expected_type)
 {
   // Check object type
   if (object->type() != Json::objectValue) {
@@ -96,7 +94,7 @@ int MapSuncg::GetJsonObjectMember(Json::Value *&result, Json::Value *object, con
 }
 
 // This function is adapted from SUNCG!
-void MapSuncg::LoadJSON(const char * houseFile, const char * input_data_directory, const bool concave,
+void Suncg::LoadJSON(const char * houseFile, const char * input_data_directory, const bool concave,
 		const vec3 offset)
 {
 	FILE* fp = fopen(houseFile, "rb");
@@ -240,7 +238,6 @@ void MapSuncg::LoadJSON(const char * houseFile, const char * input_data_director
 					}
 				}
 
-
 				vec3 scale = vec3(1);
 				quat rotation = quat();
 				vec3 translation = vec3(0);
@@ -249,7 +246,7 @@ void MapSuncg::LoadJSON(const char * houseFile, const char * input_data_director
 				glm::decompose(transformation, scale, rotation, translation, skew, persp);
 
 				rotation = conjugate(rotation);
-				translation += offset;
+				translation += (offset - vec3(40, 0, 40));
 
 				// Create scene node(s) based on type
 				char obj_name[4096], node_name[4096];
@@ -383,12 +380,10 @@ void MapSuncg::LoadJSON(const char * houseFile, const char * input_data_director
 			}
 		}
 	}
-
 }
 
-
 // This function is adapted from SUNCG!
-void MapSuncg::LoadCategoryCSV(const char * metadataFile)
+void Suncg::LoadCategoryCSV(const char * metadataFile)
 {
 	FILE *fp = fopen(metadataFile, "r");
 	if (!fp) {
@@ -472,15 +467,8 @@ void MapSuncg::LoadCategoryCSV(const char * metadataFile)
 	fclose(fp);
 }
 
-void MapSuncg::ResetMap()
+void Suncg::Reset()
 {
-	
-	printf("[World] Reset %d\n", world_->reset_count_);
-
-	if(world_->reset_count_ % 1000 == 0)
-		world_->CleanEverything();
-	else
-		world_->CleanEverything2();
 	map_bullet_label_.clear();
 	all_labels_.clear();
 	map_labels_properity.clear();
@@ -489,12 +477,12 @@ void MapSuncg::ResetMap()
 	remove_randomly_ = false;
 }
 
-void MapSuncg::AddPhysicalProperties(const std::string& label, const Properity& prop)
+void Suncg::AddPhysicalProperties(const std::string& label, const Properity& prop)
 {
 	map_labels_properity[label] = prop;
 }
 
-void MapSuncg::SetRemoveAll(const unsigned int remove)
+void Suncg::SetRemoveAll(const unsigned int remove)
 {
 	if (remove == 1) {
 		remove_all_doors_ = true;
@@ -506,18 +494,11 @@ void MapSuncg::SetRemoveAll(const unsigned int remove)
 	}
 }
 
-float MapSuncg::GetRandom(const float low, const float high)
+float Suncg::GetRandom(const float low, const float high)
 {
 	std::uniform_real_distribution<float> dist(low, high);
 	return dist(mt_);
 }
 
-void MapSuncg::SetMapSize(const float min_x, const float min_z,
-				const float max_x, const float max_z)
-{
-	world_->set_world_size(min_x, min_z, max_x, max_z);
-}
-
-void MapSuncg::GetMapAABB() {}
 
 }

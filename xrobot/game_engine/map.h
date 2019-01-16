@@ -21,13 +21,20 @@ namespace xrobot {
 
 class Map {
 public:
-    Map() : world_(nullptr) {}
+    Map() : world_(nullptr) { GenerateMap(); }
     
     virtual ~Map() {}
 
-    virtual void ResetMap() { world_->CleanEverything(); }
+    virtual void ResetMap() {
+        if(world_) {
+            if(world_->reset_count_ % 1000)
+                world_->CleanEverything2();
+            else
+                world_->CleanEverything();
+        }
+    }
 
-    void GenerateGenetricMap() { 
+    void GenerateMap() { 
         if(!world_) {
             world_ = std::make_shared<World>();
             world_->BulletInit(-9.81f, 0.01f);
