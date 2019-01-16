@@ -429,7 +429,7 @@ void RobotBase::Move(const xScalar translate, const xScalar rotate) {
         glm::vec3 dir = glm::normalize(cp_b - current_pos);
         if (cp.contact_distance < -0.01 && abs(cn[1]) < 0.2) { // hack
             int sign = 1;
-            xScalar delta = glm::clamp(cp.contact_distance, -0.05f, 0.0f);
+            xScalar delta = glm::clamp(cp.contact_distance, -0.1f, -0.01f);
             auto& object_a = bullet_world->id_to_robot_[cp.bullet_id_a]; 
             auto& object_b = bullet_world->id_to_robot_[cp.bullet_id_b];
             

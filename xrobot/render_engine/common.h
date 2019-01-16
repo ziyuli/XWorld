@@ -69,7 +69,7 @@ struct PSSM {
     CSM csm;
     int shadow_map_size = 2048;
     int cascade_count = 4;
-    float pssm_lamda = 0.7f;
+    float pssm_lamda = 0.65f;
     float near_offset = 80.0f;
     float shadow_bias_clamp = 0.0005f;
     float shadow_bias_scale = 0.0005f;

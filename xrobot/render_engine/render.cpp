@@ -23,9 +23,12 @@ Render::Render(const int width,
 	// Create Context
 	if(headless > 0) {
 		ctx_ = render_engine::CreateHeadlessContext(height, width, device);
+	} else if(headless < 0){
+		ctx_ = render_engine::CreateContext(height, width, true);
 	} else {
-		ctx_ = render_engine::CreateContext(height, width, headless < 0);
-	} 
+		conf_ |= kVisualization; 
+		ctx_ = render_engine::CreateContext(height, width, false);
+	}
 
 	// Check OpenGL Version
 	CheckVersion();
