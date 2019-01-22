@@ -7,11 +7,15 @@
 #ifndef GL_HEADER_H_
 #define GL_HEADER_H_
 
-// #include <GL/glew.h>
-
 #ifdef __linux__
 	#define GL_GLEXT_PROTOTYPES
 	#include <GL/gl.h>
+#endif
+
+#if __APPLE__
+#include "GLAD/glad.h"
+#define APPLE_GL_MAJOR 4
+#define APPLE_GL_MINOR 1
 #endif
 
 #ifdef INCLUDE_GL_CONTEXT_HEADERS

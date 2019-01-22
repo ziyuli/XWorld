@@ -34,14 +34,25 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wno-deprecated-declarations -Wno-error")
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -march=native")
+if(APPLE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework Cocoa -framework OpenGL -framework IOKit")
+endif()
+
 
 find_package(Threads REQUIRED)
 find_package(PythonInterp REQUIRED)
 find_package(PythonLibs 2.7 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS python system)
+find_package(Boost REQUIRED COMPONENTS python27 system)
 
-#include_directories(${Boost_INCLUDE_DIRS})
-#include_directories(${PYTHON_INCLUDE_DIRS})
+## apple
+if(APPLE)
+  find_library(COCOA_LIBRARY Cocoa REQUIRED)
+  find_library(IOKIT_LIBRARY IOKit REQUIRED)
+  find_library(COREVID_LIBRARY CoreVideo REQUIRED)
+endif()
+
+# include_directories(${Boost_INCLUDE_DIRS})
+# include_directories(${PYTHON_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIR})
 
 ## user can directly set GLOG_INCLUDE_DIRS and GLOG_LIBRARIES
@@ -60,11 +71,23 @@ include(glm)
 include(glfw)
 include(bullet)
 
-set(DEP_LIBS
-  ${GFLAGS_LIBRARIES}
-  ${GLOG_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${PYTHON_LIBRARIES})
+if(APPLE)
+  set(DEP_LIBS
+    ${GFLAGS_LIBRARIES}
+    ${GLOG_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${PYTHON_LIBRARIES}
+    ${COCOA_LIBRARY}
+    ${COREVID_LIBRARY}
+    ${IOKIT_LIBRARY})
+else()
+  set(DEP_LIBS
+    ${GFLAGS_LIBRARIES}
+    ${GLOG_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${PYTHON_LIBRARIES})
+endif()
+
 
 set(DEP_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}

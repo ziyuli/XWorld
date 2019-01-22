@@ -7,7 +7,7 @@ out GS_OUT {
 } gs_out;
 
 in VS_OUT {
-	bool first;
+	int first;
 } gs_in[];
 
 uniform mat4 projection;
@@ -69,7 +69,7 @@ void main()
 	if(gl_in[0].gl_Position != gl_in[1].gl_Position)
 	{
 		gs_out.Color = vec4(0,1,0,1);
-		if(gs_in[0].first)
+		if(gs_in[0].first > 0)
 			gs_out.Color = vec4(1,1,1,1);
 		draw_crosshair(gl_in[1].gl_Position);
 	}

@@ -31,9 +31,9 @@ ExternalProject_Add(bullet
 ExternalProject_Get_Property(bullet INSTALL_DIR)
 set(BULLET_INCLUDE_DIRS "${INSTALL_DIR}/include" "${INSTALL_DIR}/include/bullet")
 set(BULLET_LIBRARIES
-  "${INSTALL_DIR}/lib/libLinearMath.so"
-  "${INSTALL_DIR}/lib/libBullet3Common.so"
-  "${INSTALL_DIR}/lib/libBulletCollision.so"
-  "${INSTALL_DIR}/lib/libBulletDynamics.so"
-  "${INSTALL_DIR}/lib/libBulletInverseDynamics.so"
-  "${INSTALL_DIR}/lib/libPhysicsClientC_API.so")
+  "${INSTALL_DIR}/lib/libLinearMath${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  "${INSTALL_DIR}/lib/libBullet3Common${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  "${INSTALL_DIR}/lib/libBulletCollision${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  "${INSTALL_DIR}/lib/libBulletDynamics${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  "${INSTALL_DIR}/lib/libBulletInverseDynamics${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  "${INSTALL_DIR}/lib/libPhysicsClientC_API${CMAKE_SHARED_LIBRARY_SUFFIX}")

@@ -13,4 +13,4 @@ ExternalProject_Add(assimp
 
 ExternalProject_Get_Property(assimp INSTALL_DIR)
 set(ASSIMP_INCLUDE_DIRS "${INSTALL_DIR}/include")
-set(ASSIMP_LIBRARIES "${INSTALL_DIR}/lib/libassimp.so.4")
+set(ASSIMP_LIBRARIES "${INSTALL_DIR}/lib/libassimp${CMAKE_SHARED_LIBRARY_SUFFIX}")

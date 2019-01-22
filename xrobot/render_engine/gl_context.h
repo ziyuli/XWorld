@@ -69,17 +69,6 @@ protected:
     int device_;
 };
 
-
-// Context for EGL (server-side OpenGL on some supported GPUs)
-class EGLContext : public GLContext {
-public:
-    EGLContext(const int h, const int w, const int device = 0);
-    ~EGLContext();
-
-protected:
-    EGLDisplay eglDpy_;
-};
-
 // Context for GLFW
 class GLFWContext : public GLContext {
   public:
@@ -136,6 +125,18 @@ class GLFWContext : public GLContext {
     static float y_;
 };
 
+#ifdef __linux__
+
+// Context for EGL (server-side OpenGL on some supported GPUs)
+class EGLContext : public GLContext {
+public:
+    EGLContext(const int h, const int w, const int device = 0);
+    ~EGLContext();
+
+protected:
+    EGLDisplay eglDpy_;
+};
+
 // Context for GLXHeadless
 class GLXHeadlessContext : public GLContext {
 public:
@@ -175,19 +176,29 @@ protected:
     Display* dpy_;
 };
 
+#endif
+
 inline GLContext* CreateContext(int h, int w, bool hide = false, int device=0) {
-    #ifdef USE_GLX
-        return new GLXVisualizationContext{h, w};
+    #ifdef __linux__
+        #ifdef USE_GLX
+            return new GLXVisualizationContext{h, w};
+        #else
+            return new GLFWContext{h, w, hide};
+        #endif
     #else
         return new GLFWContext{h, w, hide};
     #endif
 }
 
 inline GLContext* CreateHeadlessContext(int h, int w, int device=0) {
-    #ifdef USE_EGL
-	   return new EGLContext{h, w, device};		
+    #ifdef __linux__
+        #ifdef USE_EGL
+    	   return new EGLContext{h, w, device};		
+        #else
+            return new GLXHeadlessContext{h, w};
+        #endif
     #else
-        return new GLXHeadlessContext{h, w};
+        return NULL;
     #endif
 }
 

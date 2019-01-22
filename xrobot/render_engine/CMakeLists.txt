@@ -1,5 +1,7 @@
 find_package(OpenGL REQUIRED)
 
+set(GLAD_DIRS "GLAD/glad.c")
+
 add_library(render_engine OBJECT 
     render_utils.cpp
     shader.cpp
@@ -22,7 +24,8 @@ add_library(render_engine OBJECT
     texture2d.cpp
     capture.cpp
     model.cpp
-    terrain_shape.cpp)
+    terrain_shape.cpp
+    ${GLAD_DIRS})
 
 add_dependencies(render_engine assimp glm glfw utils) 
 
