@@ -42,13 +42,15 @@ endif()
 find_package(Threads REQUIRED)
 find_package(PythonInterp REQUIRED)
 find_package(PythonLibs 2.7 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS python27 system)
 
 ## apple
 if(APPLE)
+  find_package(Boost REQUIRED COMPONENTS python27 system)
   find_library(COCOA_LIBRARY Cocoa REQUIRED)
   find_library(IOKIT_LIBRARY IOKit REQUIRED)
   find_library(COREVID_LIBRARY CoreVideo REQUIRED)
+else()
+  find_package(Boost REQUIRED COMPONENTS python system)
 endif()
 
 # include_directories(${Boost_INCLUDE_DIRS})

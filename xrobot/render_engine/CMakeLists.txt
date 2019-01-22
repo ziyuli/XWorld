@@ -1,6 +1,10 @@
 find_package(OpenGL REQUIRED)
 
-set(GLAD_DIRS "GLAD/glad.c")
+if(APPLE)
+  set(GLAD_DIRS "GLAD/glad.c")
+else()
+  set(GLAD_DIRS "")
+endif()
 
 add_library(render_engine OBJECT 
     render_utils.cpp
