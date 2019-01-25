@@ -43,7 +43,7 @@ constexpr int kNormalVisualize = kNormal | kVisualization;
 constexpr int kMedVisualize = kMed | kVisualization;
 constexpr int kHighVisualize = kHigh | kVisualization;
 constexpr int kExtremeVisualize = kExtreme | kVisualization;
-constexpr int kLidarCaptureRes = 64;
+constexpr int kLidarCaptureRes = 128;
 
 const int profiles[6] = {kVeryLow,
                          kLow,

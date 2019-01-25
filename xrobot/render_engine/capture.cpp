@@ -7,7 +7,9 @@ Capture::Capture(const int resolution) : resolution_(resolution),
 										 quad_vao_(0),
 			  							 quad_vbo_(0),
 										 raw_capture_fb_(0),
-										 raw_capture_cubemap_(0) {
+										 raw_capture_cubemap_(0),
+										 front_(glm::vec3(1, 0, 0)),
+										 up_(glm::vec3(0, 1, 0)) {
 	
 	capture_ = std::make_shared<RenderTarget>(resolution * 4, resolution);
 	capture_->append_r_float();
@@ -16,11 +18,14 @@ Capture::Capture(const int resolution) : resolution_(resolution),
 	InitPBOs();
 	InitShaders();
 	InitCapture();
+	InitSphericalProjection();
 }
 
 Capture::~Capture() {
 	glDeleteFramebuffers(1, &raw_capture_fb_);
 	glDeleteTextures(1, &raw_capture_cubemap_);
+	glDeleteFramebuffers(1, &spherical_projection_fb_);
+	glDeleteTextures(1, &spherical_projection_texarray_);
 	glDeleteVertexArrays(1, &quad_vao_);
 	glDeleteBuffers(1, &quad_vbo_);
 	glDeleteBuffers(1, &lidar_pbo_);
@@ -33,6 +38,41 @@ void Capture::InitPBOs() {
 			kLidarCaptureRes * kLidarCaptureRes * 4 * sizeof(float),
 			nullptr, GL_STREAM_READ);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+}
+
+void Capture::InitSphericalProjection() {
+	glGenFramebuffers(1, &spherical_projection_fb_);
+	glBindFramebuffer(GL_FRAMEBUFFER, spherical_projection_fb_);
+
+	glGenTextures(1, &spherical_projection_texarray_);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, spherical_projection_texarray_);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R16F, resolution_, resolution_, 6);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY,
+    			 0,
+    			 GL_R16F,
+    			 resolution_, 
+    			 resolution_,
+    			 6,
+    			 0,
+    			 GL_RED,
+    			 GL_FLOAT,
+    			 NULL);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+			spherical_projection_texarray_, 0);	
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "FBO failed to initialize correctly." << std::endl;
+
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Capture::InitCapture() {
@@ -57,8 +97,8 @@ void Capture::InitCapture() {
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
 			raw_capture_cubemap_, 0);
@@ -76,8 +116,13 @@ void Capture::InitShaders() {
 							    pwd + "/shaders/capture.gs",
 							    -1);
 
+	shaders_[kSphericalProjection] = Shader(pwd + "/shaders/quad.vs",
+							                pwd + "/shaders/spherical_projection.fs",
+							                pwd + "/shaders/spherical_projection.gs",
+							                -1);
+
 	shaders_[kCubemap] = Shader(pwd + "/shaders/quad.vs",
-							    pwd + "/shaders/cubemap.fs");
+							    pwd + "/shaders/flat_layers.fs");
 }
 
 void Capture::Stitch(GLuint& rgb, Image<float>& lidar_image) {
@@ -90,33 +135,24 @@ void Capture::Stitch(GLuint& rgb, Image<float>& lidar_image) {
 
 	auto cubemap  = shaders_[kCubemap];
 	cubemap.use();
-
-	glViewport(0, 0, resolution_, resolution_); 
-	cubemap.setInt("dir", 5);
 	cubemap.setInt("tex", 0);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, raw_capture_cubemap_);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, spherical_projection_texarray_);
+
+	glViewport(0, 0, resolution_, resolution_);
+	cubemap.setInt("layer", 5);
 	RenderQuad();
 
 	glViewport(resolution_, 0, resolution_, resolution_); 
-	cubemap.setInt("dir", 0);
-	cubemap.setInt("tex", 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, raw_capture_cubemap_);
+	cubemap.setInt("layer", 0);
 	RenderQuad();
 
 	glViewport(resolution_ * 2, 0, resolution_, resolution_); 
-	cubemap.setInt("dir", 4);
-	cubemap.setInt("tex", 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, raw_capture_cubemap_);
+	cubemap.setInt("layer", 4);
 	RenderQuad();
 
 	glViewport(resolution_ * 3, 0, resolution_, resolution_); 
-	cubemap.setInt("dir", 1);
-	cubemap.setInt("tex", 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, raw_capture_cubemap_);
+	cubemap.setInt("layer", 1);
 	RenderQuad();
 
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -139,26 +175,47 @@ void Capture::Stitch(GLuint& rgb, Image<float>& lidar_image) {
 	rgb = capture_->texture_id(0);
 }
 
-void Capture::RenderCubemap(RenderWorld* world, Camera* camera) {
+void Capture::SphericalProjection() {
+	glDisable(GL_DEPTH_TEST);
+
+	auto sphericalprojection = shaders_[kSphericalProjection];
+
+	sphericalprojection.use();
+	sphericalprojection.setInt("tex", 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, raw_capture_cubemap_);
+
+	glViewport(0, 0, resolution_, resolution_);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, spherical_projection_fb_);
+
+	glClearColor(0, 0, 0, 1);
+
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	RenderQuad();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);  
+}
+
+void Capture::RenderCubemap(RenderWorld* world, 
+							Camera* camera) {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
 
 	glm::vec3 eye = camera->position_;
-	glm::vec3 front = camera->front_;
-	glm::vec3 up = camera->world_up_;
-
 	glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f),
 			1.0f, 0.02f, 20.0f);
 
 	glm::mat4 capture_views[] = 
 	{
-	   glm::lookAt(eye, eye + front, glm::vec3(0.0f, -1.0f,  0.0f)),
-	   glm::lookAt(eye, eye - front, glm::vec3(0.0f, -1.0f,  0.0f)),
-	   glm::lookAt(eye, eye + up, glm::vec3(0.0f,  0.0f,  1.0f)),
-	   glm::lookAt(eye, eye - up, glm::vec3(0.0f,  0.0f, -1.0f)),
-	   glm::lookAt(eye, eye + glm::cross(front, up), glm::vec3(0.0f, -1.0f,  0.0f)),
-	   glm::lookAt(eye, eye - glm::cross(front, up), glm::vec3(0.0f, -1.0f,  0.0f))
+	   glm::lookAt(eye, eye + front_, glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(eye, eye - front_, glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(eye, eye + up_, glm::vec3(0.0f,  0.0f,  1.0f)),
+	   glm::lookAt(eye, eye - up_, glm::vec3(0.0f,  0.0f, -1.0f)),
+	   glm::lookAt(eye, eye + glm::cross(front_, up_), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(eye, eye - glm::cross(front_, up_), glm::vec3(0.0f, -1.0f,  0.0f))
 	};
 
 	auto capture = shaders_[kCapture];

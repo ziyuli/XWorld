@@ -25,8 +25,8 @@ float linearize(float depth)
 
 float visualize(vec3 dir)
 {
-	float depth_lg = texture(tex, dir).r;
-	return depth_lg;
+    float depth_lg = texture(tex, dir).r;
+    return depth_lg;
 }
 
 vec3 ViewPosFromDepth(float depth, vec2 uv) {
@@ -40,13 +40,13 @@ vec3 ViewPosFromDepth(float depth, vec2 uv) {
 
 void main()
 {
-	int innovation_x = (gl_VertexID / size);
-	int innovation_y = (gl_VertexID % size);
+    int innovation_x = (gl_VertexID / size);
+    int innovation_y = (gl_VertexID % size);
 
-	float u = float(innovation_x) / size;
-	float v = float(innovation_y) / size;
+    float u = float(innovation_x) / size;
+    float v = float(innovation_y) / size;
 
-	vec2 mapCoord = 2.0 * vec2(u, v) - 1.0;
+    vec2 mapCoord = 2.0 * vec2(u, v) - 1.0;
 
     float phi = fov_2 * mapCoord.x;
     float theta = fov_2 * mapCoord.y;
@@ -55,21 +55,21 @@ void main()
     mapCoord.y = tan(theta) / (cos(phi) * tanfov);
 
     vec3 point_view;
-	float z = 0.0;
-	if(dir == 0) {
-    	z = visualize(vec3(1, mapCoord.y, mapCoord.x));
+    float z = 0.0;
+    if(dir == 0) {
+        z = visualize(vec3(1, mapCoord.y, mapCoord.x));
         point_view = ViewPosFromDepth(z, mapCoord);
     }
     else if(dir == 1) {
-    	z = visualize(vec3(-1.0, mapCoord.y, -mapCoord.x));
+        z = visualize(vec3(-1.0, mapCoord.y, -mapCoord.x));
         point_view = ViewPosFromDepth(z, mapCoord);
     }
     else if(dir == 5) {
-    	z = visualize(vec3(-mapCoord.x, mapCoord.y, 1.0));
+        z = visualize(vec3(-mapCoord.x, mapCoord.y, 1.0));
         point_view = ViewPosFromDepth(z, mapCoord);
     }
     else if(dir == 4) {
-    	z = visualize(vec3(mapCoord.xy, -1.0));
+        z = visualize(vec3(mapCoord.xy, -1.0));
         point_view = ViewPosFromDepth(z, mapCoord);
     }
 
@@ -81,5 +81,5 @@ void main()
     if(v < 0.1 || v > 0.9)
         depth_linear = 0;
 
-	gl_Position = projection * view * vec4(point_world, 1.0);
+    gl_Position = projection * view * vec4(point_world, 1.0);
 }

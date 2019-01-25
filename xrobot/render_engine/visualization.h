@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "capture.h"
 #include "common.h"
 #include "gl_context.h"
 #include "shader.h"
@@ -36,12 +37,12 @@ public:
 				  GLContext* ctx);
 	~Visualization();
 
-	void Visualize(RenderWorld* world, Camera* camera, GLuint tex);
+	void Visualize(RenderWorld* world, Camera* camera, Capture* capture);
 	GLuint GetTexture() const { return visualization_->texture_id(0); }
 
 	void InitShaders();
 	void RenderAABB();
-	void DrawPointCloud(const GLuint tex, Camera* camera, const int size,
+	void DrawPointCloud(Capture* capture, Camera* camera, const int size,
 			const int dir);
 	void DrawRootAABB(RenderWorld* world, const Shader& shader);
 	void DrawSubTiles(RenderWorld* world, const Shader& shader);

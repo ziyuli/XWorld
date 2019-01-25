@@ -21,7 +21,7 @@ float visualize(vec3 dir, float phi, float theta)
 	float depth_lg = texture(tex, normalize(dir)).r;
 	float depth_linear = linearize(depth_lg);
 	float distance = depth_linear / abs(cos(phi) * cos(theta));
-	return distance;
+	return depth_lg;
 }
 
 void main()

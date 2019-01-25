@@ -49,9 +49,10 @@ Render::Render(const int width,
 	hud_pass_->append_bgra_uint8(); // RGBD
 	hud_pass_->init();
 
+	// Frustum Culling
 	frustum_ = std::make_shared<CameraFrustum>();
 
-	// Init
+	// Allocation
 	InitPBOs();
 	InitShaders();
 	InitVCT();
@@ -674,7 +675,7 @@ void Render::RenderVisualization(RenderWorld* world, Camera *camera) {
 		if((conf_ & kDepthCapture) && capture_) { 
 			lidar_capture = capture_->GetRawCubeMap();
 		}		
-		visualize_->Visualize(world, camera, lidar_capture);
+		visualize_->Visualize(world, camera, capture_.get());
 	}
 }
 
@@ -702,7 +703,15 @@ void Render::InitLidarCapture() {
 void Render::RenderLidarCapture(RenderWorld* world, Camera* camera, GLuint& depth) {
 	if(conf_ & kDepthCapture) {
 		capture_->RenderCubemap(world, camera);
+		capture_->SphericalProjection();
 		capture_->Stitch(depth, lidar_image_);
+	}
+}
+
+void Render::UpdateMultiRayLidar(const glm::vec3& front, const glm::vec3& up) {
+	if(conf_ & kDepthCapture) {
+		capture_->SetFront(front);
+		capture_->SetUp(up);
 	}
 }
 

@@ -58,7 +58,20 @@ void Visualization::InitShaders() {
 							        pwd+"/shaders/point.fs");
 }
 
-void Visualization::DrawPointCloud(const GLuint tex, Camera* camera, 
+// 
+// Issues
+// 1. The point cloud cannot align to the 3D environment during spherical projection.
+//    The projection method may not be correct.
+// 2. There are some fuzzy points randomly located in scene.
+//    This is because I use bilinear interp. for texture sampling.
+//    
+// TODO
+//    Change to GL_NEAREST and use 2x res cubemap for reduce miss fetching
+//
+// Currently, the visualization is directy convert back from depth in cubemap 
+// to world pos. 
+//
+void Visualization::DrawPointCloud(Capture* capture, Camera* camera, 
 		const int size, const int dir) {
 	if(pc_vao_ == 0) {
 
@@ -78,14 +91,11 @@ void Visualization::DrawPointCloud(const GLuint tex, Camera* camera,
 	glm::mat4 projection = free_camera_.GetProjectionMatrix();
 	glm::mat4 view = free_camera_.GetViewMatrix();
 	glm::vec3 eye  = glm::vec3(0);
-	glm::vec3 front = glm::vec3(1,0,0);
-	glm::vec3 up = glm::vec3(0,1,0);
+	glm::vec3 front = capture->Front();
+	glm::vec3 up = capture->Up();
 
 	glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f),
 			1.0f, 0.02f, 20.0f);
-
-	front = camera->front_;
-	up = camera->up_;
 
 	glm::mat4 capture_views[] = 
 	{
@@ -106,6 +116,11 @@ void Visualization::DrawPointCloud(const GLuint tex, Camera* camera,
 	glEnable(GL_PROGRAM_POINT_SIZE);
 	glPointSize(2.0f);
 	pointcloud.use();
+	pointcloud.setInt("tex", 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, capture->GetRawCubeMap());
+
+
 	pointcloud.setInt("size", kLidarCaptureRes);
 	pointcloud.setInt("dir", dir);
 	pointcloud.setVec3("camera_worldpos", camera->position_);
@@ -233,7 +248,7 @@ void Visualization::InitDrawTerrain(std::shared_ptr<TerrainShape> terrain) {
 }
 
 void Visualization::Visualize(RenderWorld* world, Camera* camera, 
-		GLuint tex) {
+		Capture* capture) {
 
 	GetDeltaTime();
 	ProcessMouse();
@@ -265,7 +280,6 @@ void Visualization::Visualize(RenderWorld* world, Camera* camera,
 
 	if(terrain_) {
 		terrain_->RenderTerrainForward(camera_pos, view, projection);
-
 		// glEnable(GL_LINE_SMOOTH);
 		// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		// terrain_->RenderTerrainForward(camera_pos, view, projection);
@@ -290,11 +304,11 @@ void Visualization::Visualize(RenderWorld* world, Camera* camera,
 	line.setVec3("color", glm::vec3(0,0,1));
 	DrawWorldAABB(world, line);
 	
-	if(tex > 0) {
-		DrawPointCloud(tex, camera, kLidarCaptureRes * kLidarCaptureRes, 0);
-		DrawPointCloud(tex, camera, kLidarCaptureRes * kLidarCaptureRes, 4);
-		DrawPointCloud(tex, camera, kLidarCaptureRes * kLidarCaptureRes, 5);
-		DrawPointCloud(tex, camera, kLidarCaptureRes * kLidarCaptureRes, 1);
+	if(capture) {
+		DrawPointCloud(capture, camera, kLidarCaptureRes * kLidarCaptureRes, 0);
+		DrawPointCloud(capture, camera, kLidarCaptureRes * kLidarCaptureRes, 4);
+		DrawPointCloud(capture, camera, kLidarCaptureRes * kLidarCaptureRes, 5);
+		DrawPointCloud(capture, camera, kLidarCaptureRes * kLidarCaptureRes, 1);
 	}
 
 	if(lidar_) {

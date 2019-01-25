@@ -59,6 +59,9 @@ public:
     void InitDrawBatchRays(const int rays);
     void UpdateRay(const int offset, const glm::vec3 from, const glm::vec3 to);
 
+    // Lidar
+    void UpdateMultiRayLidar(const glm::vec3& front, const glm::vec3& up);
+
     // IO
     Image<unsigned char> GetRenderedImage() const { return render_image_; }
     Image<float>         GetLidarImage() const { return lidar_image_; };

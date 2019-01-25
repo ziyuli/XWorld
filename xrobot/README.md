@@ -25,12 +25,11 @@ There are a few good starting points for familiarizing oneself with the code:
 
 For Python users:
 - Look at `API.md` for the usage of creating an environment and controlling the robot
-- Look at `python_example/` for defining tasks
-
+- Look at `python_example/` for all examples
 
 # Code Overview
 
-The code in the `xrobot/directory` is organized as follows:
+The code in the `xrobot/` is organized as follows:
 
 - data/ contains all necessary models and textures for running basic tests and tutorials
 - vendor/ contains code for loading json and images
@@ -41,6 +40,7 @@ The code in the `xrobot/directory` is organized as follows:
 - render_engine/ contains code for rendering the scene
     - render_engine/EGL/ contains EGL extensions
     - render_engine/KHR/ contains Khronos platform-specific types and definitions
+    - render_engine/GLAD/ contains platform-specific types and definitions
     - render_engine/shaders/ contains various shaders which are necessary for render engine
 
 # Performance
@@ -52,6 +52,14 @@ On Ubuntu and derivatives, use following script to benchmark:
 The results are approximate framerates in each process (include rendering and simulation). The total framerate should reach approx. 1000 - 1500 fps on decent Nvidia GPU with EGL backend.
 
 This benchmark requires SUNCG JSON format scene file with all 3D modles and textures!
+
+# Experiment
+
+Some features are experimental, which means the implementation may still need to improve or the results may not fully correct!
+
+- Outdoor Environment (Terrain)
+- Multi-ray Lidar
+- High Quality Rendering
 
 # Python Tutorial
 

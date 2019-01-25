@@ -22,6 +22,7 @@ namespace render_engine {
 
 enum CaptureShaders {
     kCapture,
+    kSphericalProjection,
     kCubemap,
     kCaptureShaders
 };
@@ -31,23 +32,36 @@ public:
 	Capture(const int resolution);
 	~Capture();
 
+	void SphericalProjection();
 	void Stitch(GLuint& rgb, Image<float>& lidar_image);
-	void RenderCubemap(RenderWorld* world, Camera* camera);
+	void RenderCubemap(RenderWorld* world, 
+					   Camera* camera);
 
 	GLuint GetRawCubeMap() const { return raw_capture_cubemap_; }
+	glm::vec3 Front() const { return front_; }
+	glm::vec3 Up() const { return up_; }
+	void SetFront(const glm::vec3 front) { front_ = front; }
+	void SetUp(const glm::vec3 up) { up_ = up; }
 
 private:
 	void InitPBOs();
 	void InitShaders();
 	void InitCapture();
+	void InitSphericalProjection();
 	void Draw(RenderWorld* world, const Shader& shader);
 	void RenderQuad();
 
 	int resolution_;
 	GLuint raw_capture_fb_;
 	GLuint raw_capture_cubemap_;
+
+	GLuint spherical_projection_fb_;
+	GLuint spherical_projection_texarray_;
+
 	GLuint quad_vao_, quad_vbo_;
 	GLuint lidar_pbo_;
+
+	glm::vec3 front_, up_;
 
 	std::shared_ptr<RenderTarget> capture_;
 

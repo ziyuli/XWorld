@@ -137,6 +137,9 @@ namespace xrobot
         front_vector.y = 0;
         front_vector = glm::normalize(front_vector);
 
+        // Update Multiray Lidar
+        renderer_->UpdateMultiRayLidar(front_vector, glm::vec3(0, 1, 0));
+
         // Update Lidar
         std::vector<RayTestInfo> batch_raycast_result;
         lidar_->Update(front_vector,
